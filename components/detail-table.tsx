@@ -51,14 +51,25 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
           <tbody>
             {/* Máximo CAC */}
             <tr>
-              <td className={tdLabelCls}>Máximo CAC</td>
+              <td className={tdLabelCls}>
+                Máximo CAC
+                <span className="ml-1.5 text-[9px] text-amber-400/70">●</span>
+              </td>
               {d.maxCAC.map((v, i) => (
-                <td key={i} className={tdValCls}>
-                  {fmt(v)}
+                <td key={i} className="border-b border-zinc-900 px-1 py-1.5">
+                  <EditCell
+                    value={v}
+                    onChange={(val) => onUpdate("maxCAC", i, val)}
+                  />
                 </td>
               ))}
               <td className={`${tdValCls} font-bold text-zinc-500`}>
-                {fmt(d.maxCAC.reduce((a, b) => a + b, 0) / 12)}
+                {(() => {
+                  const valid = d.maxCAC.filter((v) => v > 0);
+                  return valid.length
+                    ? fmt(valid.reduce((a, b) => a + b, 0) / valid.length)
+                    : "—";
+                })()}
               </td>
             </tr>
 
