@@ -1,0 +1,47 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --accent-cppem: #3b82f6;
+  --accent-unicv: #a78bfa;
+  --lime: #a3e635;
+  --danger: #f87171;
+  --amber: #fbbf24;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #09090b;
+  color: #fafafa;
+}
+
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a;
+  border-radius: 4px;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+@layer utilities {
+  .tnum {
+    font-feature-settings: "tnum";
+  }
+}
