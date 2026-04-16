@@ -21,7 +21,7 @@ import {
 } from "@/lib/data-store";
 import { Header } from "@/components/header";
 import { KpiCard } from "@/components/kpi-card";
-import { BarChart } from "@/components/bar-chart";
+import { LineChart } from "@/components/line-chart";
 import { Tag } from "@/components/tag";
 import { DetailTable } from "@/components/detail-table";
 import { InvestmentSplit } from "@/components/investment-split";
@@ -236,32 +236,16 @@ export default function Home() {
             </div>
             <div className="flex gap-3.5 text-[11px] text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-white/[0.08] bg-white/[0.06]" />
-                Teto
+                <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: "#ef4444" }} />
+                CAC Máximo (teto)
               </span>
               <span className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #a3e635, #65a30d)",
-                  }}
-                />
-                Real OK
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #f87171, #b91c1c)",
-                  }}
-                />
-                Estourou
+                <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: "#3b82f6" }} />
+                CAC Real
               </span>
             </div>
           </div>
-          <BarChart
+          <LineChart
             maxCAC={d.maxCAC}
             realCAC={comp.realCAC}
             ceiling={comp.ceiling}
