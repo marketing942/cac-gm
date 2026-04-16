@@ -1,21 +1,25 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
-  INITIAL_DATA,
   INITIAL_YEAR,
   MONTHS,
+  PRODUCTS,
   PRODUCT_META,
   computeCAC,
   createEmptyYear,
-  loadStoredData,
-  saveStoredData,
   fmt,
   fmtK,
   type CACData,
   type Product,
   type ProductData,
 } from "@/lib/data";
+import {
+  loadAllFromSupabase,
+  seedInitialData,
+  upsertProduct,
+  deleteYear as deleteYearOnServer,
+} from "@/lib/data-store";
 import { Header } from "@/components/header";
 import { KpiCard } from "@/components/kpi-card";
 import { BarChart } from "@/components/bar-chart";
@@ -25,33 +29,94 @@ import { InvestmentSplit } from "@/components/investment-split";
 import { EfficiencyGrid } from "@/components/efficiency-grid";
 import { Projection } from "@/components/projection";
 
+type SyncState = "idle" | "saving" | "saved" | "error";
+
 export default function Home() {
-  const [data, setData] = useState<CACData>(INITIAL_DATA);
+  const [data, setData] = useState<CACData | null>(null);
   const [year, setYear] = useState<number>(INITIAL_YEAR);
   const [prod, setProd] = useState<Product>("cppem");
-  const [hydrated, setHydrated] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  const lastSavedRef = useRef<CACData>({});
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Initial load from Supabase (seed on first run)
   useEffect(() => {
-    const stored = loadStoredData();
-    setData(stored);
-    const yrs = Object.keys(stored).map(Number).sort((a, b) => b - a);
-    if (yrs.length && !yrs.includes(year)) setYear(yrs[0]);
-    setHydrated(true);
+    (async () => {
+      try {
+        let loaded = await loadAllFromSupabase();
+        if (Object.keys(loaded).length === 0) {
+          await seedInitialData();
+          loaded = await loadAllFromSupabase();
+        }
+        lastSavedRef.current = structuredClone(loaded);
+        setData(loaded);
+        const yrs = Object.keys(loaded).map(Number).sort((a, b) => b - a);
+        if (yrs.length && !yrs.includes(year)) setYear(yrs[0]);
+      } catch (e) {
+        console.error("Failed to load data from Supabase", e);
+        setLoadError(
+          e instanceof Error ? e.message : "Erro desconhecido ao carregar dados."
+        );
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist changes after hydration
+  // Debounced diff-based save
   useEffect(() => {
-    if (hydrated) saveStoredData(data);
-  }, [data, hydrated]);
+    if (!data) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+
+    saveTimerRef.current = setTimeout(async () => {
+      const prev = lastSavedRef.current;
+      const tasks: Promise<void>[] = [];
+
+      const nextYears = Object.keys(data).map(Number);
+      const prevYears = Object.keys(prev).map(Number);
+
+      prevYears.forEach((y) => {
+        if (!nextYears.includes(y)) tasks.push(deleteYearOnServer(y));
+      });
+
+      nextYears.forEach((y) => {
+        PRODUCTS.forEach((p) => {
+          const nextPD = data[y][p];
+          const prevPD = prev[y]?.[p];
+          if (!prevPD || JSON.stringify(prevPD) !== JSON.stringify(nextPD)) {
+            tasks.push(upsertProduct(y, p, nextPD));
+          }
+        });
+      });
+
+      if (tasks.length === 0) return;
+
+      setSyncState("saving");
+      try {
+        await Promise.all(tasks);
+        lastSavedRef.current = structuredClone(data);
+        setSyncState("saved");
+        if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
+        savedFlashRef.current = setTimeout(() => setSyncState("idle"), 1500);
+      } catch (e) {
+        console.error("Save failed", e);
+        setSyncState("error");
+      }
+    }, 600);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [data]);
 
   const years = useMemo(
-    () => Object.keys(data).map(Number).sort((a, b) => a - b),
+    () => (data ? Object.keys(data).map(Number).sort((a, b) => a - b) : []),
     [data]
   );
 
-  const yearData = data[year] ?? createEmptyYear();
+  const yearData = (data && data[year]) ?? createEmptyYear();
   const d = yearData[prod];
   const comp = useMemo(() => computeCAC(d), [d]);
 
@@ -62,6 +127,7 @@ export default function Home() {
   const updateField = useCallback(
     (field: keyof ProductData, idx: number, value: number) => {
       setData((prev) => {
+        if (!prev) return prev;
         const next: CACData = { ...prev };
         const yd = next[year] ? { ...next[year] } : createEmptyYear();
         const pd: ProductData = {
@@ -81,6 +147,7 @@ export default function Home() {
 
   const addYear = useCallback(() => {
     setData((prev) => {
+      if (!prev) return prev;
       const existing = Object.keys(prev).map(Number);
       const nextY =
         (existing.length ? Math.max(...existing) : INITIAL_YEAR - 1) + 1;
@@ -96,6 +163,7 @@ export default function Home() {
   const removeYear = useCallback(
     (y: number) => {
       setData((prev) => {
+        if (!prev) return prev;
         const keys = Object.keys(prev).map(Number);
         if (keys.length <= 1) return prev;
         const next: CACData = { ...prev };
@@ -109,6 +177,37 @@ export default function Home() {
     },
     [year]
   );
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0 px-4">
+        <div className="max-w-md rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center">
+          <div className="mb-2 text-[13px] font-bold text-red-600 dark:text-red-400">
+            Erro ao carregar dados
+          </div>
+          <div className="text-[12px] text-fg-body">{loadError}</div>
+          <div className="mt-3 text-[11px] text-fg-muted">
+            Verifique as credenciais do Supabase e se a migration
+            <code className="mx-1 rounded bg-surface-2 px-1 py-0.5">cac_data</code>
+            foi aplicada.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-850 border-t-amber-400" />
+          <div className="text-[11px] font-medium text-fg-muted">
+            Carregando dados…
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-0 text-fg">
@@ -271,9 +370,31 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="flex flex-wrap justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
+      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
         <span>GM Educação · Controle de CAC · Multi-ano</span>
-        <span>Cálculos em tempo real · Dados salvos no navegador</span>
+        <span className="flex items-center gap-2">
+          <span>Cálculos em tempo real · Dados compartilhados</span>
+          <span
+            className={[
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-opacity",
+              syncState === "saving"
+                ? "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                : syncState === "saved"
+                ? "bg-lime-500/10 text-lime-600 dark:text-lime-400"
+                : syncState === "error"
+                ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                : "opacity-0",
+            ].join(" ")}
+          >
+            {syncState === "saving"
+              ? "Salvando…"
+              : syncState === "saved"
+              ? "✓ Salvo"
+              : syncState === "error"
+              ? "⚠ Erro ao salvar"
+              : ""}
+          </span>
+        </span>
       </footer>
     </div>
   );
