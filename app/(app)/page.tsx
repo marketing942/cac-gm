@@ -18,7 +18,6 @@ import {
   loadAllFromSupabase,
   seedInitialData,
   upsertProduct,
-  deleteYear as deleteYearOnServer,
 } from "@/lib/data-store";
 import { Header } from "@/components/header";
 import { KpiCard } from "@/components/kpi-card";
@@ -75,11 +74,6 @@ export default function Home() {
       const tasks: Promise<void>[] = [];
 
       const nextYears = Object.keys(data).map(Number);
-      const prevYears = Object.keys(prev).map(Number);
-
-      prevYears.forEach((y) => {
-        if (!nextYears.includes(y)) tasks.push(deleteYearOnServer(y));
-      });
 
       nextYears.forEach((y) => {
         PRODUCTS.forEach((p) => {
@@ -111,11 +105,6 @@ export default function Home() {
     };
   }, [data]);
 
-  const years = useMemo(
-    () => (data ? Object.keys(data).map(Number).sort((a, b) => a - b) : []),
-    [data]
-  );
-
   const yearData = (data && data[year]) ?? createEmptyYear();
   const d = yearData[prod];
   const comp = useMemo(() => computeCAC(d), [d]);
@@ -143,39 +132,6 @@ export default function Home() {
       });
     },
     [prod, year]
-  );
-
-  const addYear = useCallback(() => {
-    setData((prev) => {
-      if (!prev) return prev;
-      const existing = Object.keys(prev).map(Number);
-      const nextY =
-        (existing.length ? Math.max(...existing) : INITIAL_YEAR - 1) + 1;
-      if (prev[nextY]) {
-        setYear(nextY);
-        return prev;
-      }
-      setYear(nextY);
-      return { ...prev, [nextY]: createEmptyYear() };
-    });
-  }, []);
-
-  const removeYear = useCallback(
-    (y: number) => {
-      setData((prev) => {
-        if (!prev) return prev;
-        const keys = Object.keys(prev).map(Number);
-        if (keys.length <= 1) return prev;
-        const next: CACData = { ...prev };
-        delete next[y];
-        if (year === y) {
-          const remaining = Object.keys(next).map(Number).sort((a, b) => b - a);
-          setYear(remaining[0]);
-        }
-        return next;
-      });
-    },
-    [year]
   );
 
   if (loadError) {
@@ -214,11 +170,8 @@ export default function Home() {
       <Header
         product={prod}
         year={year}
-        years={years}
         onProductChange={setProd}
         onYearChange={setYear}
-        onAddYear={addYear}
-        onRemoveYear={removeYear}
       />
 
       <main className="mx-auto max-w-[1200px] px-7 py-6">

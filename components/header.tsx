@@ -1,25 +1,19 @@
 "use client";
 
-import { PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
+import { PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
 
 interface HeaderProps {
   product: Product;
   year: number;
-  years: number[];
   onProductChange: (p: Product) => void;
   onYearChange: (y: number) => void;
-  onAddYear: () => void;
-  onRemoveYear: (y: number) => void;
 }
 
 export function Header({
   product,
   year,
-  years,
   onProductChange,
   onYearChange,
-  onAddYear,
-  onRemoveYear,
 }: HeaderProps) {
   const meta = PRODUCT_META[product];
 
@@ -50,47 +44,20 @@ export function Header({
       <div className="flex flex-wrap items-center gap-3">
         {/* Year selector */}
         <div className="flex items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-          {years.map((y) => (
-            <div key={y} className="group relative">
-              <button
-                onClick={() => onYearChange(y)}
-                className="rounded-md border-none px-3 py-[7px] text-[12px] font-bold transition-all duration-200"
-                style={{
-                  background: year === y ? meta.accent : "transparent",
-                  color: year === y ? "#0a0a0a" : "#71717a",
-                  cursor: "pointer",
-                }}
-              >
-                {y}
-              </button>
-              {years.length > 1 && (
-                <button
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        `Remover dados do ano ${y}? Esta ação não pode ser desfeita.`
-                      )
-                    ) {
-                      onRemoveYear(y);
-                    }
-                  }}
-                  title={`Remover ${y}`}
-                  className="absolute -right-1 -top-1 hidden h-[14px] w-[14px] items-center justify-center rounded-full bg-surface-3 text-[9px] font-black text-fg-body hover:bg-red-500 hover:text-white group-hover:flex"
-                  style={{ cursor: "pointer" }}
-                >
-                  ×
-                </button>
-              )}
-            </div>
+          {YEARS.map((y) => (
+            <button
+              key={y}
+              onClick={() => onYearChange(y)}
+              className="rounded-md border-none px-3 py-[7px] text-[12px] font-bold transition-all duration-200"
+              style={{
+                background: year === y ? meta.accent : "transparent",
+                color: year === y ? "#0a0a0a" : "#71717a",
+                cursor: "pointer",
+              }}
+            >
+              {y}
+            </button>
           ))}
-          <button
-            onClick={onAddYear}
-            title="Adicionar próximo ano"
-            className="rounded-md border-none px-2.5 py-[7px] text-[14px] font-black text-fg-muted transition-colors hover:text-fg"
-            style={{ cursor: "pointer" }}
-          >
-            +
-          </button>
         </div>
 
         {/* Product selector */}
