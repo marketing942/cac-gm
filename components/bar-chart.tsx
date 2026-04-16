@@ -33,11 +33,15 @@ export function BarChart({ maxCAC, realCAC, ceiling }: BarChartProps) {
           >
             {/* Value label */}
             <div
-              className="mb-1 h-3.5 text-[10px] font-bold"
-              style={{
-                color: over ? "#f87171" : rVal ? "#a3e635" : "#3f3f46",
-                fontFeatureSettings: "'tnum'",
-              }}
+              className={[
+                "mb-1 h-3.5 text-[10px] font-bold",
+                over
+                  ? "text-red-600 dark:text-red-400"
+                  : rVal
+                  ? "text-lime-600 dark:text-lime-400"
+                  : "text-fg-muted",
+              ].join(" ")}
+              style={{ fontFeatureSettings: "'tnum'" }}
             >
               {rVal != null ? fmtK(rVal) : ""}
             </div>
@@ -49,19 +53,19 @@ export function BarChart({ maxCAC, realCAC, ceiling }: BarChartProps) {
             >
               {/* Max bar */}
               <div
-                className="w-[40%] rounded-t border border-white/[0.06] bg-white/[0.04] transition-all duration-500"
+                className="w-[40%] rounded-t border border-zinc-850 bg-surface-2 transition-all duration-500"
                 style={{ height: mH }}
               />
               {/* Real bar */}
               <div
-                className="w-[40%] rounded-t transition-all duration-500"
+                className="w-[40%] rounded-t bg-surface-2 transition-all duration-500"
                 style={{
                   height: rH || 2,
                   background: over
                     ? "linear-gradient(180deg, #f87171 0%, #b91c1c 100%)"
                     : rVal
                     ? "linear-gradient(180deg, #a3e635 0%, #65a30d 100%)"
-                    : "rgba(255,255,255,0.03)",
+                    : undefined,
                   boxShadow:
                     rVal && !over
                       ? "0 0 12px rgba(163,230,53,0.15)"
