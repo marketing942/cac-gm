@@ -16,7 +16,7 @@ const thCls =
 const tdLabelCls =
   "whitespace-nowrap border-b border-zinc-900 px-3 py-2.5 text-[13px] font-semibold text-zinc-500";
 const tdValCls =
-  "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-zinc-300";
+  "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-fg-body";
 
 export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
   return (
@@ -75,7 +75,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
 
             {/* Real CAC */}
             <tr className="bg-white/[0.01]">
-              <td className={`${tdLabelCls} font-bold text-zinc-50`}>
+              <td className={`${tdLabelCls} font-bold text-fg`}>
                 Real CAC
               </td>
               {comp.realCAC.map((v, i) => {
@@ -186,7 +186,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                 </td>
               ))}
               <td
-                className={`${tdValCls} text-[15px] font-extrabold text-zinc-50`}
+                className={`${tdValCls} text-[15px] font-extrabold text-fg`}
               >
                 {comp.totalCli.toLocaleString("pt-BR")}
               </td>

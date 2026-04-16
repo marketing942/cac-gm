@@ -40,7 +40,7 @@ export function Projection({ comp, accent }: ProjectionProps) {
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         {items.map((p, i) => (
-          <div key={i} className="rounded-lg border border-zinc-800 bg-surface-2 px-4 py-3">
+          <div key={i} className="rounded-lg border border-zinc-850 bg-surface-2 px-4 py-3">
             <div className="text-[10px] font-semibold uppercase tracking-[1px] text-zinc-600">
               {p.label}
             </div>

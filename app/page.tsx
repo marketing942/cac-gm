@@ -111,7 +111,7 @@ export default function Home() {
   );
 
   return (
-    <div className="min-h-screen bg-surface-0 text-zinc-50">
+    <div className="min-h-screen bg-surface-0 text-fg">
       <Header
         product={prod}
         year={year}

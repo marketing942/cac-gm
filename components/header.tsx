@@ -27,7 +27,7 @@ export function Header({
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-900 bg-gradient-to-b from-white/[0.015] to-transparent px-7 py-5">
       <div className="flex items-center gap-3.5">
         <div
-          className="flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-lg border border-zinc-800 shadow-lg"
+          className="flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-lg border border-zinc-850 shadow-lg"
           style={{ background: meta.badgeBg }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -49,7 +49,7 @@ export function Header({
 
       <div className="flex flex-wrap items-center gap-3">
         {/* Year selector */}
-        <div className="flex items-center rounded-lg border border-zinc-800 bg-surface-2 p-[3px]">
+        <div className="flex items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
           {years.map((y) => (
             <div key={y} className="group relative">
               <button
@@ -75,7 +75,7 @@ export function Header({
                     }
                   }}
                   title={`Remover ${y}`}
-                  className="absolute -right-1 -top-1 hidden h-[14px] w-[14px] items-center justify-center rounded-full bg-zinc-800 text-[9px] font-black text-zinc-400 hover:bg-red-500 hover:text-white group-hover:flex"
+                  className="absolute -right-1 -top-1 hidden h-[14px] w-[14px] items-center justify-center rounded-full bg-surface-3 text-[9px] font-black text-fg-body hover:bg-red-500 hover:text-white group-hover:flex"
                   style={{ cursor: "pointer" }}
                 >
                   ×
@@ -86,7 +86,7 @@ export function Header({
           <button
             onClick={onAddYear}
             title="Adicionar próximo ano"
-            className="rounded-md border-none px-2.5 py-[7px] text-[14px] font-black text-zinc-500 transition-colors hover:text-zinc-200"
+            className="rounded-md border-none px-2.5 py-[7px] text-[14px] font-black text-fg-muted transition-colors hover:text-fg"
             style={{ cursor: "pointer" }}
           >
             +
@@ -94,7 +94,7 @@ export function Header({
         </div>
 
         {/* Product selector */}
-        <div className="flex rounded-lg border border-zinc-800 bg-surface-2 p-[3px]">
+        <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
           {PRODUCTS.map((p) => {
             const m = PRODUCT_META[p];
             const active = product === p;

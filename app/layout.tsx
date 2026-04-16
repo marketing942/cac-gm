@@ -1,10 +1,29 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Sidebar } from "@/components/sidebar";
 
 export const metadata: Metadata = {
-  title: "CAC Dashboard — GM Educação 2026",
-  description: "Controle de Custo de Aquisição de Clientes — CPPEM e UNICV",
+  title: "GM Educação · Dashboards",
+  description:
+    "Painel executivo de controle de CAC e métricas operacionais · CPPEM, Colégio CPPEM e Unicive",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
 };
+
+const themeInitScript = `
+  (function () {
+    try {
+      var key = 'cac-dashboard-theme';
+      var t = localStorage.getItem(key) || 'system';
+      var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = t === 'dark' || (t === 'system' && sysDark);
+      if (isDark) document.documentElement.classList.add('dark');
+    } catch (e) {}
+  })();
+`;
 
 export default function RootLayout({
   children,
@@ -12,8 +31,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"
@@ -24,9 +44,16 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
-      <body className="antialiased" style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}>
-        {children}
+      <body
+        className="antialiased"
+        style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}
+      >
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </body>
     </html>
   );
