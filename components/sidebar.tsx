@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ThemeToggle } from "./theme-toggle";
+import { signOut } from "@/app/login/actions";
 
 interface NavItem {
   key: string;
@@ -71,6 +72,16 @@ function IconClose({ size = 18 }: { size?: number }) {
   );
 }
 
+function IconLogout({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
 const ITEMS: NavItem[] = [
   { key: "cac", label: "CAC", href: "/", icon: <IconChart />, active: true },
   { key: "leads", label: "Leads", href: "#", icon: <IconTarget />, disabled: true },
@@ -80,7 +91,11 @@ const ITEMS: NavItem[] = [
 
 const SIDEBAR_KEY = "cac-dashboard-sidebar-open";
 
-export function Sidebar() {
+interface SidebarProps {
+  userEmail?: string | null;
+}
+
+export function Sidebar({ userEmail = null }: SidebarProps) {
   const [open, setOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -228,7 +243,7 @@ export function Sidebar() {
             </ul>
           </nav>
 
-          {/* Footer: theme + version */}
+          {/* Footer: theme + user + version */}
           <div className="border-t border-zinc-850 p-3">
             {open || mobileOpen ? (
               <>
@@ -236,13 +251,48 @@ export function Sidebar() {
                   Aparência
                 </div>
                 <ThemeToggle />
+
+                {userEmail && (
+                  <div className="mt-3 border-t border-zinc-850 pt-3">
+                    <div className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-[1.2px] text-fg-muted">
+                      Conta
+                    </div>
+                    <div
+                      className="truncate px-1 text-[11px] font-semibold text-fg-body"
+                      title={userEmail}
+                    >
+                      {userEmail}
+                    </div>
+                    <form action={signOut}>
+                      <button
+                        type="submit"
+                        className="mt-2 flex w-full items-center gap-2 rounded-lg border border-zinc-850 bg-surface-2 px-2.5 py-1.5 text-[11px] font-semibold text-fg-body transition-colors hover:border-red-500/40 hover:text-red-600 dark:hover:text-red-400"
+                      >
+                        <IconLogout />
+                        <span>Sair</span>
+                      </button>
+                    </form>
+                  </div>
+                )}
+
                 <div className="mt-3 px-1 text-[9px] font-medium text-fg-muted">
                   v1.0 · GM Educação
                 </div>
               </>
             ) : (
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-2">
                 <ThemeToggle compact />
+                {userEmail && (
+                  <form action={signOut}>
+                    <button
+                      type="submit"
+                      title={`Sair (${userEmail})`}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg text-fg-body transition-colors hover:bg-surface-2 hover:text-red-600 dark:hover:text-red-400"
+                    >
+                      <IconLogout />
+                    </button>
+                  </form>
+                )}
               </div>
             )}
           </div>

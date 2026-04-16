@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/sidebar";
 
 export const metadata: Metadata = {
   title: "GM Educação · Dashboards",
@@ -50,10 +49,7 @@ export default function RootLayout({
         className="antialiased"
         style={{ fontFamily: "'Outfit', system-ui, sans-serif" }}
       >
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <div className="min-w-0 flex-1">{children}</div>
-        </div>
+        {children}
       </body>
     </html>
   );
