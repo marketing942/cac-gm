@@ -43,26 +43,6 @@ function IconTarget({ size = 18 }: { size?: number }) {
   );
 }
 
-function IconCoins({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="8" cy="8" r="6" />
-      <path d="M18.09 10.37A6 6 0 1 1 10.34 18" />
-      <path d="M7 6h1v4" />
-      <path d="M16.71 13.88l.7.71-2.82 2.82" />
-    </svg>
-  );
-}
-
-function IconPie({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21.21 15.89A10 10 0 1 1 8 2.83" />
-      <path d="M22 12A10 10 0 0 0 12 2v10z" />
-    </svg>
-  );
-}
-
 function IconClose({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -84,9 +64,13 @@ function IconLogout({ size = 16 }: { size?: number }) {
 
 const ITEMS: NavItem[] = [
   { key: "cac", label: "CAC", href: "/", icon: <IconChart />, active: true },
-  { key: "leads", label: "Leads", href: "#", icon: <IconTarget />, disabled: true },
-  { key: "vendas", label: "Vendas", href: "#", icon: <IconCoins />, disabled: true },
-  { key: "financeiro", label: "Financeiro", href: "#", icon: <IconPie />, disabled: true },
+  {
+    key: "metas",
+    label: "Desdobramento de metas anuais",
+    href: "#",
+    icon: <IconTarget />,
+    disabled: true,
+  },
 ];
 
 const SIDEBAR_KEY = "cac-dashboard-sidebar-open";
