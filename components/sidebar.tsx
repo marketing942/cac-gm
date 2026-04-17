@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { ThemeToggle } from "./theme-toggle";
 import { signOut } from "@/app/login/actions";
 
@@ -8,8 +9,6 @@ interface NavItem {
   key: string;
   label: string;
   href: string;
-  icon: React.ReactNode;
-  active?: boolean;
   disabled?: boolean;
 }
 
@@ -43,6 +42,19 @@ function IconTarget({ size = 18 }: { size?: number }) {
   );
 }
 
+function IconScale({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v17" />
+      <path d="M5 8l7-5 7 5" />
+      <path d="M3 13l4 6h-1" />
+      <path d="M7 19H3" />
+      <path d="M21 13l-4 6h1" />
+      <path d="M17 19h4" />
+    </svg>
+  );
+}
+
 function IconClose({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -63,15 +75,21 @@ function IconLogout({ size = 16 }: { size?: number }) {
 }
 
 const ITEMS: NavItem[] = [
-  { key: "cac", label: "CAC", href: "/", icon: <IconChart />, active: true },
+  { key: "cac", label: "CAC", href: "/" },
+  { key: "breakeven", label: "Breakeven", href: "/breakeven" },
   {
     key: "metas",
     label: "Desdobramento de metas anuais",
     href: "#",
-    icon: <IconTarget />,
     disabled: true,
   },
 ];
+
+const ITEM_ICONS: Record<string, React.ReactNode> = {
+  cac: <IconChart />,
+  breakeven: <IconScale />,
+  metas: <IconTarget />,
+};
 
 const SIDEBAR_KEY = "cac-dashboard-sidebar-open";
 
@@ -80,6 +98,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ userEmail = null }: SidebarProps) {
+  const pathname = usePathname();
   const [open, setOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -173,7 +192,11 @@ export function Sidebar({ userEmail = null }: SidebarProps) {
             </div>
             <ul className="space-y-1">
               {ITEMS.map((item) => {
-                const isActive = item.active;
+                const isActive =
+                  !item.disabled &&
+                  (item.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(item.href));
                 const isDisabled = item.disabled;
                 return (
                   <li key={item.key}>
@@ -186,6 +209,7 @@ export function Sidebar({ userEmail = null }: SidebarProps) {
                       }
                       onClick={(e) => {
                         if (isDisabled) e.preventDefault();
+                        if (!isDisabled) setMobileOpen(false);
                       }}
                       className={[
                         "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-semibold transition-colors",
@@ -202,7 +226,7 @@ export function Sidebar({ userEmail = null }: SidebarProps) {
                           isActive ? "text-fg" : "",
                         ].join(" ")}
                       >
-                        {item.icon}
+                        {ITEM_ICONS[item.key]}
                       </span>
                       {(open || mobileOpen) && (
                         <>
