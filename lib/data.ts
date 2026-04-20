@@ -24,6 +24,8 @@ export const MONTHS_FULL = [
 
 export const PRODUCTS: Product[] = ["cppem", "colegio", "unicv"];
 
+export const YEARS = [2026, 2027, 2028, 2029, 2030] as const;
+
 export interface ProductMeta {
   label: string;
   short: string;
@@ -155,39 +157,3 @@ export const fmtK = (v: number): string =>
 
 export const fmtPct = (v: number | null): string =>
   v == null ? "—" : (v > 0 ? "+" : "") + (v * 100).toFixed(0) + "%";
-
-// ─── Persistence (localStorage) ───
-export const STORAGE_KEY = "cac-dashboard-data-v2";
-
-export function loadStoredData(): CACData {
-  if (typeof window === "undefined") return INITIAL_DATA;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return INITIAL_DATA;
-    const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return INITIAL_DATA;
-    const out: CACData = {};
-    for (const [y, v] of Object.entries(parsed)) {
-      const yr = Number(y);
-      if (!Number.isFinite(yr)) continue;
-      const year = v as Partial<YearData>;
-      out[yr] = {
-        cppem:   year.cppem   ?? emptyProductData(),
-        colegio: year.colegio ?? emptyProductData(),
-        unicv:   year.unicv   ?? emptyProductData(),
-      };
-    }
-    return Object.keys(out).length ? out : INITIAL_DATA;
-  } catch {
-    return INITIAL_DATA;
-  }
-}
-
-export function saveStoredData(data: CACData): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    /* ignore quota / private mode errors */
-  }
-}

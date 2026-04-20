@@ -1,57 +1,111 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
-  INITIAL_DATA,
   INITIAL_YEAR,
   MONTHS,
+  PRODUCTS,
   PRODUCT_META,
   computeCAC,
   createEmptyYear,
-  loadStoredData,
-  saveStoredData,
   fmt,
   fmtK,
   type CACData,
   type Product,
   type ProductData,
 } from "@/lib/data";
+import {
+  loadAllFromSupabase,
+  seedInitialData,
+  upsertProduct,
+} from "@/lib/data-store";
 import { Header } from "@/components/header";
 import { KpiCard } from "@/components/kpi-card";
-import { BarChart } from "@/components/bar-chart";
+import { LineChart } from "@/components/line-chart";
 import { Tag } from "@/components/tag";
 import { DetailTable } from "@/components/detail-table";
 import { InvestmentSplit } from "@/components/investment-split";
 import { EfficiencyGrid } from "@/components/efficiency-grid";
 import { Projection } from "@/components/projection";
 
+type SyncState = "idle" | "saving" | "saved" | "error";
+
 export default function Home() {
-  const [data, setData] = useState<CACData>(INITIAL_DATA);
+  const [data, setData] = useState<CACData | null>(null);
   const [year, setYear] = useState<number>(INITIAL_YEAR);
   const [prod, setProd] = useState<Product>("cppem");
-  const [hydrated, setHydrated] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Load from localStorage on mount
+  const lastSavedRef = useRef<CACData>({});
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Initial load from Supabase (seed on first run)
   useEffect(() => {
-    const stored = loadStoredData();
-    setData(stored);
-    const yrs = Object.keys(stored).map(Number).sort((a, b) => b - a);
-    if (yrs.length && !yrs.includes(year)) setYear(yrs[0]);
-    setHydrated(true);
+    (async () => {
+      try {
+        let loaded = await loadAllFromSupabase();
+        if (Object.keys(loaded).length === 0) {
+          await seedInitialData();
+          loaded = await loadAllFromSupabase();
+        }
+        lastSavedRef.current = structuredClone(loaded);
+        setData(loaded);
+        const yrs = Object.keys(loaded).map(Number).sort((a, b) => b - a);
+        if (yrs.length && !yrs.includes(year)) setYear(yrs[0]);
+      } catch (e) {
+        console.error("Failed to load data from Supabase", e);
+        setLoadError(
+          e instanceof Error ? e.message : "Erro desconhecido ao carregar dados."
+        );
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Persist changes after hydration
+  // Debounced diff-based save
   useEffect(() => {
-    if (hydrated) saveStoredData(data);
-  }, [data, hydrated]);
+    if (!data) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
-  const years = useMemo(
-    () => Object.keys(data).map(Number).sort((a, b) => a - b),
-    [data]
-  );
+    saveTimerRef.current = setTimeout(async () => {
+      const prev = lastSavedRef.current;
+      const tasks: Promise<void>[] = [];
 
-  const yearData = data[year] ?? createEmptyYear();
+      const nextYears = Object.keys(data).map(Number);
+
+      nextYears.forEach((y) => {
+        PRODUCTS.forEach((p) => {
+          const nextPD = data[y][p];
+          const prevPD = prev[y]?.[p];
+          if (!prevPD || JSON.stringify(prevPD) !== JSON.stringify(nextPD)) {
+            tasks.push(upsertProduct(y, p, nextPD));
+          }
+        });
+      });
+
+      if (tasks.length === 0) return;
+
+      setSyncState("saving");
+      try {
+        await Promise.all(tasks);
+        lastSavedRef.current = structuredClone(data);
+        setSyncState("saved");
+        if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
+        savedFlashRef.current = setTimeout(() => setSyncState("idle"), 1500);
+      } catch (e) {
+        console.error("Save failed", e);
+        setSyncState("error");
+      }
+    }, 600);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [data]);
+
+  const yearData = (data && data[year]) ?? createEmptyYear();
   const d = yearData[prod];
   const comp = useMemo(() => computeCAC(d), [d]);
 
@@ -62,6 +116,7 @@ export default function Home() {
   const updateField = useCallback(
     (field: keyof ProductData, idx: number, value: number) => {
       setData((prev) => {
+        if (!prev) return prev;
         const next: CACData = { ...prev };
         const yd = next[year] ? { ...next[year] } : createEmptyYear();
         const pd: ProductData = {
@@ -79,47 +134,44 @@ export default function Home() {
     [prod, year]
   );
 
-  const addYear = useCallback(() => {
-    setData((prev) => {
-      const existing = Object.keys(prev).map(Number);
-      const nextY =
-        (existing.length ? Math.max(...existing) : INITIAL_YEAR - 1) + 1;
-      if (prev[nextY]) {
-        setYear(nextY);
-        return prev;
-      }
-      setYear(nextY);
-      return { ...prev, [nextY]: createEmptyYear() };
-    });
-  }, []);
+  if (loadError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0 px-4">
+        <div className="max-w-md rounded-xl border border-red-500/30 bg-red-500/5 p-6 text-center">
+          <div className="mb-2 text-[13px] font-bold text-red-600 dark:text-red-400">
+            Erro ao carregar dados
+          </div>
+          <div className="text-[12px] text-fg-body">{loadError}</div>
+          <div className="mt-3 text-[11px] text-fg-muted">
+            Verifique as credenciais do Supabase e se a migration
+            <code className="mx-1 rounded bg-surface-2 px-1 py-0.5">cac_data</code>
+            foi aplicada.
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const removeYear = useCallback(
-    (y: number) => {
-      setData((prev) => {
-        const keys = Object.keys(prev).map(Number);
-        if (keys.length <= 1) return prev;
-        const next: CACData = { ...prev };
-        delete next[y];
-        if (year === y) {
-          const remaining = Object.keys(next).map(Number).sort((a, b) => b - a);
-          setYear(remaining[0]);
-        }
-        return next;
-      });
-    },
-    [year]
-  );
+  if (!data) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-0">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-850 border-t-amber-400" />
+          <div className="text-[11px] font-medium text-fg-muted">
+            Carregando dados…
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-surface-0 text-fg">
       <Header
         product={prod}
         year={year}
-        years={years}
         onProductChange={setProd}
         onYearChange={setYear}
-        onAddYear={addYear}
-        onRemoveYear={removeYear}
       />
 
       <main className="mx-auto max-w-[1200px] px-7 py-6">
@@ -184,32 +236,16 @@ export default function Home() {
             </div>
             <div className="flex gap-3.5 text-[11px] text-zinc-500">
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm border border-white/[0.08] bg-white/[0.06]" />
-                Teto
+                <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: "#ef4444" }} />
+                CAC Máximo (teto)
               </span>
               <span className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #a3e635, #65a30d)",
-                  }}
-                />
-                Real OK
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="inline-block h-2.5 w-2.5 rounded-sm"
-                  style={{
-                    background:
-                      "linear-gradient(180deg, #f87171, #b91c1c)",
-                  }}
-                />
-                Estourou
+                <span className="inline-block h-[3px] w-4 rounded-full" style={{ background: "#3b82f6" }} />
+                CAC Real
               </span>
             </div>
           </div>
-          <BarChart
+          <LineChart
             maxCAC={d.maxCAC}
             realCAC={comp.realCAC}
             ceiling={comp.ceiling}
@@ -271,9 +307,31 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="flex flex-wrap justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
+      <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
         <span>GM Educação · Controle de CAC · Multi-ano</span>
-        <span>Cálculos em tempo real · Dados salvos no navegador</span>
+        <span className="flex items-center gap-2">
+          <span>Cálculos em tempo real · Dados compartilhados</span>
+          <span
+            className={[
+              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-opacity",
+              syncState === "saving"
+                ? "bg-amber-400/10 text-amber-600 dark:text-amber-400"
+                : syncState === "saved"
+                ? "bg-lime-500/10 text-lime-600 dark:text-lime-400"
+                : syncState === "error"
+                ? "bg-red-500/10 text-red-600 dark:text-red-400"
+                : "opacity-0",
+            ].join(" ")}
+          >
+            {syncState === "saving"
+              ? "Salvando…"
+              : syncState === "saved"
+              ? "✓ Salvo"
+              : syncState === "error"
+              ? "⚠ Erro ao salvar"
+              : ""}
+          </span>
+        </span>
       </footer>
     </div>
   );
