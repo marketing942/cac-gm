@@ -392,21 +392,36 @@ export default function MetasPage() {
                     </td>
                     {MONTHS.map((_, i) => {
                       const val = getMonthValue(row, i);
+                      const showPct =
+                        (row.key === "pago" || row.key === "organico") &&
+                        comp.leadsNecessario[i] > 0;
+                      const pct = showPct
+                        ? Math.round((val / comp.leadsNecessario[i]) * 100)
+                        : 0;
                       return (
                         <td key={i} className="px-1.5 py-1.5">
                           {row.editable && row.field ? (
-                            row.type === "percent" ? (
-                              <EditablePct
-                                value={val}
-                                onChange={(v) => updateCell(row.field!, i, v)}
-                              />
-                            ) : (
-                              <EditableNumber
-                                value={val}
-                                onChange={(v) => updateCell(row.field!, i, v)}
-                                prefix={row.type === "currency" ? "R$ " : undefined}
-                              />
-                            )
+                            <div className="flex items-center gap-1">
+                              <div className="flex-1">
+                                {row.type === "percent" ? (
+                                  <EditablePct
+                                    value={val}
+                                    onChange={(v) => updateCell(row.field!, i, v)}
+                                  />
+                                ) : (
+                                  <EditableNumber
+                                    value={val}
+                                    onChange={(v) => updateCell(row.field!, i, v)}
+                                    prefix={row.type === "currency" ? "R$ " : undefined}
+                                  />
+                                )}
+                              </div>
+                              {showPct && (
+                                <span className="whitespace-nowrap text-[9px] font-bold text-fg-muted">
+                                  {pct}%
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <div
                               className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
@@ -420,13 +435,22 @@ export default function MetasPage() {
                     })}
                     <td className="border-l border-zinc-850 px-2 py-1.5">
                       <div
-                        className="rounded px-1 py-0.5 text-right text-[12px] font-bold"
+                        className="flex items-center justify-end gap-1 rounded px-1 py-0.5 text-right text-[12px] font-bold"
                         style={{
                           fontFeatureSettings: "'tnum'",
                           color: meta.accent,
                         }}
                       >
                         {formatValue(getAnnualValue(row), row.type)}
+                        {(row.key === "pago" || row.key === "organico") &&
+                          comp.anual.leadsNecessario > 0 && (
+                            <span className="text-[9px] font-bold text-fg-muted">
+                              {Math.round(
+                                (getAnnualValue(row) / comp.anual.leadsNecessario) * 100
+                              )}
+                              %
+                            </span>
+                          )}
                       </div>
                     </td>
                   </tr>
