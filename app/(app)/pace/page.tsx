@@ -224,8 +224,8 @@ function StatRow({
 
 export default function PacePage() {
   const [data, setData] = useState<PaceAllData | null>(null);
-  const [month, setMonth] = useState(CUR_MONTH);
-  const [year, setYear] = useState(CUR_YEAR);
+  const year = CUR_YEAR;
+  const month = CUR_MONTH;
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -332,8 +332,6 @@ export default function PacePage() {
     );
   }
 
-  const months = Array.from({ length: 12 }, (_, i) => i + 1);
-
   return (
     <div className="min-h-screen bg-surface-0 text-fg">
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-900 bg-gradient-to-b from-white/[0.015] to-transparent px-7 py-5">
@@ -344,26 +342,6 @@ export default function PacePage() {
           <div className="text-[11px] font-medium text-zinc-600">
             {MONTH_NAMES[month - 1]} de {year} · Dia {new Date().getDate()} de{" "}
             {new Date(year, month, 0).getDate()}
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Month selector */}
-          <div className="flex flex-wrap items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {months.map((m) => (
-              <button
-                key={m}
-                onClick={() => setMonth(m)}
-                className="rounded-md border-none px-2 py-[6px] text-[11px] font-bold transition-all duration-200"
-                style={{
-                  background: month === m ? "#fbbf24" : "transparent",
-                  color: month === m ? "#0a0a0a" : "#71717a",
-                  cursor: "pointer",
-                }}
-              >
-                {MONTH_NAMES[m - 1].slice(0, 3)}
-              </button>
-            ))}
           </div>
         </div>
       </header>
@@ -386,7 +364,7 @@ export default function PacePage() {
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
         <span>GM Educação · Calculadora de Pace</span>
         <span className="flex items-center gap-2">
-          <span>Dados compartilhados · Meta auto-preenchida das Metas Anuais</span>
+          <span>Dados compartilhados · Mês atual</span>
           <span
             className={[
               "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide transition-opacity",
