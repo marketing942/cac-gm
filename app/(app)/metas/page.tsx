@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MONTHS, PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
+import type { MetasComputed } from "@/lib/metas";
 import {
   computeMetas,
   createEmptyMetasData,
@@ -123,6 +124,138 @@ function EditablePct({
       {fmtPctMetas(value)}
     </div>
   );
+}
+
+const CHART_W = 720;
+const CHART_H = 220;
+const CHART_PAD = { top: 30, right: 20, bottom: 28, left: 64 };
+const CHART_PLOT_W = CHART_W - CHART_PAD.left - CHART_PAD.right;
+const CHART_PLOT_H = CHART_H - CHART_PAD.top - CHART_PAD.bottom;
+
+function MetasLineChart({
+  values,
+  label,
+  color,
+  unit,
+}: {
+  values: number[];
+  label: string;
+  color: string;
+  unit: "currency" | "count";
+}) {
+  const max = Math.max(...values, 1) * 1.15;
+
+  function xPos(i: number) {
+    return CHART_PAD.left + (i / 11) * CHART_PLOT_W;
+  }
+  function yPos(v: number) {
+    return CHART_PAD.top + CHART_PLOT_H - (v / max) * CHART_PLOT_H;
+  }
+  function fmtLabel(v: number): string {
+    if (unit === "currency") {
+      if (v >= 1000) return `R$ ${(v / 1000).toFixed(0)}k`;
+      return `R$ ${Math.round(v)}`;
+    }
+    return Math.round(v).toLocaleString("pt-BR");
+  }
+
+  const points = values
+    .map((v, i) => (v > 0 ? `${xPos(i)},${yPos(v)}` : null))
+    .filter(Boolean)
+    .join(" ");
+
+  const dots = values
+    .map((v, i) => (v > 0 ? { cx: xPos(i), cy: yPos(v), val: v, idx: i } : null))
+    .filter(Boolean) as { cx: number; cy: number; val: number; idx: number }[];
+
+  const gridLines = 5;
+  const gridValues = Array.from({ length: gridLines + 1 }, (_, i) =>
+    Math.round((max / gridLines) * i)
+  );
+
+  return (
+    <div className="rounded-xl border border-zinc-850 bg-surface-1 p-5">
+      <div className="mb-3 text-[13px] font-bold text-fg">{label}</div>
+      <div className="w-full overflow-x-auto">
+        <svg viewBox={`0 0 ${CHART_W} ${CHART_H}`} className="w-full" style={{ minWidth: 500 }}>
+          {gridValues.map((v) => (
+            <g key={v}>
+              <line
+                x1={CHART_PAD.left} y1={yPos(v)}
+                x2={CHART_W - CHART_PAD.right} y2={yPos(v)}
+                className="stroke-zinc-200 dark:stroke-zinc-800"
+                strokeWidth={1}
+                strokeDasharray={v === 0 ? "none" : "3 3"}
+              />
+              <text
+                x={CHART_PAD.left - 8} y={yPos(v) + 3}
+                textAnchor="end"
+                className="fill-zinc-400 dark:fill-zinc-600"
+                fontSize={9} fontWeight={600}
+                style={{ fontFeatureSettings: "'tnum'" }}
+              >
+                {fmtLabel(v)}
+              </text>
+            </g>
+          ))}
+          {MONTHS.map((m, i) => (
+            <text
+              key={i} x={xPos(i)} y={CHART_H - 6}
+              textAnchor="middle"
+              className="fill-zinc-400 dark:fill-zinc-500"
+              fontSize={10} fontWeight={600}
+            >
+              {m}
+            </text>
+          ))}
+          {points && (
+            <polyline
+              points={points}
+              fill="none"
+              stroke={color}
+              strokeWidth={2.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          )}
+          {dots.map((dot) => (
+            <g key={dot.idx}>
+              <circle
+                cx={dot.cx} cy={dot.cy} r={4.5}
+                fill={color}
+                stroke="white" strokeWidth={1.5}
+                className="dark:stroke-zinc-900"
+              />
+              <text
+                x={dot.cx} y={dot.cy - 10}
+                textAnchor="middle"
+                fill={color}
+                fontSize={9} fontWeight={700}
+                style={{ fontFeatureSettings: "'tnum'" }}
+              >
+                {fmtLabel(dot.val)}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function getChartConfig(product: Product): { values: (comp: MetasComputed, d: MetasData) => number[]; label: string; unit: "currency" | "count" } {
+  if (product === "cppem") {
+    return {
+      values: (_comp, d) => d.valorVender,
+      label: "R$ Meta Faturamento",
+      unit: "currency",
+    };
+  }
+  return {
+    values: (comp) => comp.vendasNecessarias,
+    label: "Qtd Matrículas / Vendas",
+    unit: "count",
+  };
 }
 
 interface RowDef {
@@ -350,7 +483,7 @@ export default function MetasPage() {
         </div>
       </header>
 
-      <main className="px-4 py-6 sm:px-7">
+      <main className="space-y-6 px-4 py-6 sm:px-7">
         <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
           <table className="w-full min-w-[1100px] text-[12px]">
             <thead>
@@ -392,11 +525,17 @@ export default function MetasPage() {
                     </td>
                     {MONTHS.map((_, i) => {
                       const val = getMonthValue(row, i);
-                      const showPct =
+                      const annualVal = getAnnualValue(row);
+                      const showLeadPct =
                         (row.key === "pago" || row.key === "organico") &&
                         comp.leadsNecessario[i] > 0;
-                      const pct = showPct
+                      const leadPct = showLeadPct
                         ? Math.round((val / comp.leadsNecessario[i]) * 100)
+                        : 0;
+                      const showAnnualPct =
+                        row.type !== "percent" && annualVal > 0 && val > 0;
+                      const annualPct = showAnnualPct
+                        ? Math.round((val / annualVal) * 100)
                         : 0;
                       return (
                         <td key={i} className="px-1.5 py-1.5">
@@ -416,18 +555,32 @@ export default function MetasPage() {
                                   />
                                 )}
                               </div>
-                              {showPct && (
-                                <span className="whitespace-nowrap text-[9px] font-bold text-fg-muted">
-                                  {pct}%
-                                </span>
-                              )}
+                              <div className="flex flex-col items-end gap-0">
+                                {showAnnualPct && (
+                                  <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
+                                    {annualPct}%
+                                  </span>
+                                )}
+                                {showLeadPct && (
+                                  <span className="whitespace-nowrap text-[9px] font-bold text-fg-muted">
+                                    {leadPct}%
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           ) : (
-                            <div
-                              className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
-                              style={{ fontFeatureSettings: "'tnum'" }}
-                            >
-                              {formatValue(val, row.type)}
+                            <div className="flex items-center justify-end gap-1">
+                              <div
+                                className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
+                                style={{ fontFeatureSettings: "'tnum'" }}
+                              >
+                                {formatValue(val, row.type)}
+                              </div>
+                              {showAnnualPct && (
+                                <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
+                                  {annualPct}%
+                                </span>
+                              )}
                             </div>
                           )}
                         </td>
@@ -459,6 +612,18 @@ export default function MetasPage() {
             </tbody>
           </table>
         </div>
+
+        {(() => {
+          const chartCfg = getChartConfig(prod);
+          return (
+            <MetasLineChart
+              values={chartCfg.values(comp, d)}
+              label={`${meta.label} · ${chartCfg.label}`}
+              color={meta.accent}
+              unit={chartCfg.unit}
+            />
+          );
+        })()}
       </main>
 
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
