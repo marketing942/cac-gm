@@ -6,8 +6,10 @@ import {
   PACE_CONFIG,
   MONTH_NAMES,
   computePace,
+  EMPTY_PACE_ENTRY,
   type PaceAllData,
   type PaceEntry,
+  type PaceField,
 } from "@/lib/pace";
 import {
   loadPaceData,
@@ -21,16 +23,76 @@ const NOW = new Date();
 const CUR_YEAR = NOW.getFullYear();
 const CUR_MONTH = NOW.getMonth() + 1;
 
-function fmtVal(v: number, unit: "currency" | "count"): string {
-  if (unit === "currency")
-    return (
-      "R$ " +
-      v.toLocaleString("pt-BR", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      })
-    );
+function fmtCurrency(v: number): string {
+  return (
+    "R$ " +
+    v.toLocaleString("pt-BR", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+  );
+}
+
+function fmtInt(v: number): string {
   return Math.round(v).toLocaleString("pt-BR");
+}
+
+function fmtPct(v: number): string {
+  return (v * 100).toFixed(1).replace(".", ",") + "%";
+}
+
+function fmtVal(v: number, unit: "currency" | "count"): string {
+  return unit === "currency" ? fmtCurrency(v) : fmtInt(v);
+}
+
+function DeficitBadge({
+  deficit,
+  format,
+}: {
+  deficit: number;
+  format: (v: number) => string;
+}) {
+  if (deficit === 0) return null;
+  const isNeg = deficit > 0;
+  return (
+    <span
+      className="ml-1 whitespace-nowrap rounded-full px-1.5 py-px text-[9px] font-bold"
+      style={{
+        color: isNeg ? "#f87171" : "#a3e635",
+        background: isNeg ? "rgba(248,113,113,0.1)" : "rgba(163,230,53,0.1)",
+      }}
+    >
+      {isNeg ? "−" : "+"}{format(Math.abs(deficit))}
+    </span>
+  );
+}
+
+function PaceInput({
+  value,
+  onChange,
+  placeholder,
+  highlight,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  placeholder?: string;
+  highlight?: boolean;
+}) {
+  return (
+    <input
+      type="number"
+      value={value || ""}
+      onChange={(e) => onChange(Number(e.target.value) || 0)}
+      className={[
+        "w-full rounded-md px-2 py-1.5 text-[12px] font-semibold text-fg outline-none transition-colors",
+        highlight
+          ? "border-[1.5px] border-dashed border-amber-400/50 bg-amber-400/[0.06] focus:border-amber-400 focus:bg-amber-400/10"
+          : "border border-zinc-850 bg-surface-2 focus:border-zinc-700",
+      ].join(" ")}
+      style={{ fontFeatureSettings: "'tnum'" }}
+      placeholder={placeholder || "0"}
+    />
+  );
 }
 
 function PaceCard({
@@ -44,7 +106,7 @@ function PaceCard({
   entry: PaceEntry;
   year: number;
   month: number;
-  onUpdate: (field: "meta" | "realizado", value: number) => void;
+  onUpdate: (field: PaceField, value: number) => void;
 }) {
   const meta = PRODUCT_META[product];
   const config = PACE_CONFIG[product];
@@ -67,10 +129,16 @@ function PaceCard({
   const progressWidth = Math.min(comp.pacePercent, 100);
   const idealWidth = comp.diasMes > 0 ? (comp.diaAtual / comp.diasMes) * 100 : 0;
 
+  const mainUnit = config.unit;
+  const deficitVendas = entry.meta > 0 ? comp.metaIdealHoje - entry.realizado : 0;
+  const deficitLeads = entry.metaLeads > 0 ? entry.metaLeads - entry.leadsRealizados : 0;
+  const deficitTicket = entry.ticketMedioMeta > 0 ? entry.ticketMedioMeta - entry.ticketMedioReal : 0;
+  const deficitConversao = entry.conversaoMeta > 0 ? entry.conversaoMeta - entry.conversaoReal : 0;
+
   return (
     <div className="rounded-xl border border-zinc-850 bg-surface-1 p-5">
       {/* Header */}
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mb-3 flex items-center gap-3">
         <div
           className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-zinc-850"
           style={{ background: meta.badgeBg }}
@@ -92,55 +160,17 @@ function PaceCard({
         </div>
       </div>
 
-      {/* Editable fields */}
-      <div className="mb-4 space-y-3">
-        <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[1px] text-zinc-500">
-            Meta mensal
-          </label>
-          <input
-            type="number"
-            value={entry.meta || ""}
-            onChange={(e) => onUpdate("meta", Number(e.target.value) || 0)}
-            className="w-full rounded-lg border border-zinc-850 bg-surface-2 px-3 py-2 text-[14px] font-semibold text-fg outline-none transition-colors focus:border-amber-400/60"
-            style={{ fontFeatureSettings: "'tnum'" }}
-            placeholder={config.unit === "currency" ? "R$ 0,00" : "0"}
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[1px] text-zinc-500">
-            {config.realizadoLabel}
-            <span className="ml-1.5 normal-case tracking-normal text-amber-500">
-              (preencha aqui)
-            </span>
-          </label>
-          <input
-            type="number"
-            value={entry.realizado || ""}
-            onChange={(e) => onUpdate("realizado", Number(e.target.value) || 0)}
-            className="w-full rounded-lg border-2 border-dashed border-amber-400/50 bg-amber-400/[0.06] px-3 py-2.5 text-[16px] font-bold text-fg outline-none transition-colors focus:border-amber-400 focus:bg-amber-400/10"
-            style={{ fontFeatureSettings: "'tnum'" }}
-            placeholder={config.unit === "currency" ? "R$ 0,00" : "0"}
-          />
-        </div>
-      </div>
-
       {/* Progress bar */}
       <div className="mb-4">
         <div className="relative h-5 w-full overflow-hidden rounded-full bg-surface-2">
           <div
             className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
-            style={{
-              width: `${progressWidth}%`,
-              background: paceColor,
-              opacity: 0.25,
-            }}
+            style={{ width: `${progressWidth}%`, background: paceColor, opacity: 0.25 }}
           />
           <div
             className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
             style={{ width: `${progressWidth}%`, background: paceColor }}
           />
-          {/* Ideal marker */}
           <div
             className="absolute top-0 h-full w-[2px] bg-fg/30"
             style={{ left: `${idealWidth}%` }}
@@ -148,10 +178,7 @@ function PaceCard({
           />
           <div
             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[10px] font-black"
-            style={{
-              color:
-                progressWidth > 45 ? "#0a0a0a" : undefined,
-            }}
+            style={{ color: progressWidth > 45 ? "#0a0a0a" : undefined }}
           >
             {comp.pacePercent.toFixed(1)}%
           </div>
@@ -162,62 +189,115 @@ function PaceCard({
         </div>
       </div>
 
-      {/* Computed stats */}
-      <div className="space-y-2">
-        <StatRow
-          label="Meta ideal até hoje"
-          value={fmtVal(comp.metaIdealHoje, config.unit)}
-          color="#71717a"
-        />
-        <StatRow
-          label={comp.deficit > 0 ? "Déficit" : "Superávit"}
-          value={
-            (comp.deficit > 0 ? "−" : "+") +
-            " " +
-            fmtVal(Math.abs(comp.deficit), config.unit)
-          }
-          color={comp.deficit > 0 ? "#f87171" : "#a3e635"}
-        />
-        <StatRow
-          label="Pace atual"
-          value={comp.pacePercent.toFixed(1) + "%"}
-          color={paceColor}
-          bold
-        />
-        <StatRow
-          label="Projeção final"
-          value={fmtVal(comp.projecaoFinal, config.unit)}
-          color={comp.projecaoFinal >= entry.meta && entry.meta > 0 ? "#a3e635" : "#f87171"}
-          bold
-        />
-      </div>
-    </div>
-  );
-}
+      {/* Data table */}
+      <div className="space-y-1">
+        {/* Table header */}
+        <div className="grid grid-cols-[1fr_1fr_1fr] gap-1 px-1 pb-1">
+          <span className="text-[9px] font-bold uppercase tracking-[0.5px] text-zinc-600">Indicador</span>
+          <span className="text-center text-[9px] font-bold uppercase tracking-[0.5px] text-zinc-600">Meta</span>
+          <span className="text-center text-[9px] font-bold uppercase tracking-[0.5px] text-zinc-600">Realizado</span>
+        </div>
 
-function StatRow({
-  label,
-  value,
-  color,
-  bold,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  bold?: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border border-zinc-850 bg-surface-2 px-3 py-2">
-      <span className="text-[11px] font-medium text-fg-body">{label}</span>
-      <span
-        className={[
-          "text-[13px]",
-          bold ? "font-black" : "font-semibold",
-        ].join(" ")}
-        style={{ color, fontFeatureSettings: "'tnum'" }}
-      >
-        {value}
-      </span>
+        {/* Vendas / Faturamento */}
+        <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-1 rounded-lg border border-zinc-850 bg-surface-2 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-fg-body">
+            {mainUnit === "currency" ? "Faturamento" : "Vendas"}
+          </span>
+          <PaceInput
+            value={entry.meta}
+            onChange={(v) => onUpdate("meta", v)}
+            placeholder={mainUnit === "currency" ? "R$" : "0"}
+          />
+          <div className="flex items-center">
+            <PaceInput
+              value={entry.realizado}
+              onChange={(v) => onUpdate("realizado", v)}
+              placeholder="0"
+              highlight
+            />
+            <DeficitBadge deficit={deficitVendas} format={(v) => fmtVal(v, mainUnit)} />
+          </div>
+        </div>
+
+        {/* Leads */}
+        <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-1 rounded-lg border border-zinc-850 bg-surface-2 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-fg-body">Leads</span>
+          <PaceInput
+            value={entry.metaLeads}
+            onChange={(v) => onUpdate("metaLeads", v)}
+          />
+          <div className="flex items-center">
+            <PaceInput
+              value={entry.leadsRealizados}
+              onChange={(v) => onUpdate("leadsRealizados", v)}
+              highlight
+            />
+            <DeficitBadge deficit={deficitLeads} format={fmtInt} />
+          </div>
+        </div>
+
+        {/* Ticket Médio (CPPEM only) */}
+        {config.hasTicket && (
+          <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-1 rounded-lg border border-zinc-850 bg-surface-2 px-2 py-1.5">
+            <span className="text-[10px] font-semibold text-fg-body">Ticket Médio</span>
+            <PaceInput
+              value={entry.ticketMedioMeta}
+              onChange={(v) => onUpdate("ticketMedioMeta", v)}
+              placeholder="R$"
+            />
+            <div className="flex items-center">
+              <PaceInput
+                value={entry.ticketMedioReal}
+                onChange={(v) => onUpdate("ticketMedioReal", v)}
+                placeholder="R$"
+                highlight
+              />
+              <DeficitBadge deficit={deficitTicket} format={fmtCurrency} />
+            </div>
+          </div>
+        )}
+
+        {/* Conversão */}
+        <div className="grid grid-cols-[1fr_1fr_1fr] items-center gap-1 rounded-lg border border-zinc-850 bg-surface-2 px-2 py-1.5">
+          <span className="text-[10px] font-semibold text-fg-body">Conversão</span>
+          <PaceInput
+            value={entry.conversaoMeta * 100}
+            onChange={(v) => onUpdate("conversaoMeta", v / 100)}
+            placeholder="%"
+          />
+          <div className="flex items-center">
+            <PaceInput
+              value={entry.conversaoReal * 100}
+              onChange={(v) => onUpdate("conversaoReal", v / 100)}
+              placeholder="%"
+              highlight
+            />
+            <DeficitBadge deficit={deficitConversao} format={fmtPct} />
+          </div>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="mt-3 space-y-1">
+        <div className="flex items-center justify-between rounded-lg border border-zinc-850 bg-surface-2 px-3 py-1.5">
+          <span className="text-[10px] font-medium text-fg-body">Pace atual</span>
+          <span className="text-[13px] font-black" style={{ color: paceColor, fontFeatureSettings: "'tnum'" }}>
+            {comp.pacePercent.toFixed(1)}%
+          </span>
+        </div>
+        <div className="flex items-center justify-between rounded-lg border border-zinc-850 bg-surface-2 px-3 py-1.5">
+          <span className="text-[10px] font-medium text-fg-body">Projeção final</span>
+          <span
+            className="text-[13px] font-black"
+            style={{
+              color: comp.projecaoFinal >= entry.meta && entry.meta > 0 ? "#a3e635" : "#f87171",
+              fontFeatureSettings: "'tnum'",
+            }}
+          >
+            {fmtVal(comp.projecaoFinal, mainUnit)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -294,7 +374,7 @@ export default function PacePage() {
   }, [data, year, month]);
 
   const handleUpdate = useCallback(
-    (product: Product, field: "meta" | "realizado", value: number) => {
+    (product: Product, field: PaceField, value: number) => {
       setData((prev) => {
         if (!prev) return prev;
         return { ...prev, [product]: { ...prev[product], [field]: value } };
@@ -312,9 +392,9 @@ export default function PacePage() {
           </div>
           <div className="text-[12px] text-fg-body">{loadError}</div>
           <div className="mt-3 text-[11px] text-fg-muted">
-            Verifique se a migration
+            Verifique se as migrations
             <code className="mx-1 rounded bg-surface-2 px-1 py-0.5">pace_data</code>
-            foi aplicada no SQL Editor do Supabase.
+            foram aplicadas no SQL Editor do Supabase.
           </div>
         </div>
       </div>
@@ -344,10 +424,9 @@ export default function PacePage() {
             {new Date(year, month, 0).getDate()}
           </div>
         </div>
-
       </header>
 
-      <main className="mx-auto max-w-[1200px] px-4 py-6 sm:px-7">
+      <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-7">
         <div className="grid gap-5 md:grid-cols-3">
           {PRODUCTS.map((p) => (
             <PaceCard

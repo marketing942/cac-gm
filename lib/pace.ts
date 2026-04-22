@@ -3,7 +3,15 @@ import type { Product } from "./data";
 export interface PaceEntry {
   meta: number;
   realizado: number;
+  metaLeads: number;
+  leadsRealizados: number;
+  ticketMedioMeta: number;
+  ticketMedioReal: number;
+  conversaoMeta: number;
+  conversaoReal: number;
 }
+
+export type PaceField = keyof PaceEntry;
 
 export type PaceAllData = Record<Product, PaceEntry>;
 
@@ -20,6 +28,7 @@ export interface PaceProductConfig {
   unit: "currency" | "count";
   realizadoLabel: string;
   metaSource: "valorVender" | "vendasNecessarias";
+  hasTicket: boolean;
 }
 
 export const PACE_CONFIG: Record<Product, PaceProductConfig> = {
@@ -27,17 +36,31 @@ export const PACE_CONFIG: Record<Product, PaceProductConfig> = {
     unit: "currency",
     realizadoLabel: "Vendas até hoje",
     metaSource: "valorVender",
+    hasTicket: true,
   },
   colegio: {
     unit: "count",
     realizadoLabel: "Matrículas até hoje",
     metaSource: "vendasNecessarias",
+    hasTicket: false,
   },
   unicv: {
     unit: "count",
     realizadoLabel: "Matrículas até hoje",
     metaSource: "vendasNecessarias",
+    hasTicket: false,
   },
+};
+
+export const EMPTY_PACE_ENTRY: PaceEntry = {
+  meta: 0,
+  realizado: 0,
+  metaLeads: 0,
+  leadsRealizados: 0,
+  ticketMedioMeta: 0,
+  ticketMedioReal: 0,
+  conversaoMeta: 0,
+  conversaoReal: 0,
 };
 
 function daysInMonth(year: number, month: number): number {
