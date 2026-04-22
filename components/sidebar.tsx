@@ -101,9 +101,10 @@ const SIDEBAR_KEY = "cac-dashboard-sidebar-open";
 
 interface SidebarProps {
   userEmail?: string | null;
+  isAdmin?: boolean;
 }
 
-export function Sidebar({ userEmail = null }: SidebarProps) {
+export function Sidebar({ userEmail = null, isAdmin = false }: SidebarProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -197,7 +198,7 @@ export function Sidebar({ userEmail = null }: SidebarProps) {
               Dashboards
             </div>
             <ul className="space-y-1">
-              {ITEMS.map((item) => {
+              {ITEMS.filter((item) => item.key !== "breakeven" || isAdmin).map((item) => {
                 const isActive =
                   !item.disabled &&
                   (item.href === "/"

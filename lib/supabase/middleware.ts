@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdmin } from "@/lib/auth";
 
 const PUBLIC_PATHS = ["/login", "/auth"];
 
@@ -42,6 +43,14 @@ export async function updateSession(request: NextRequest) {
   }
 
   if (user && pathname.startsWith("/login")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/";
+    url.search = "";
+    return NextResponse.redirect(url);
+  }
+
+  // Block non-admin users from accessing breakeven
+  if (user && pathname.startsWith("/breakeven") && !isAdmin(user.email)) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";

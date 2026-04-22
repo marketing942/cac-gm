@@ -27,10 +27,12 @@ import { DetailTable } from "@/components/detail-table";
 import { InvestmentSplit } from "@/components/investment-split";
 import { EfficiencyGrid } from "@/components/efficiency-grid";
 import { Projection } from "@/components/projection";
+import { useUser } from "@/components/user-provider";
 
 type SyncState = "idle" | "saving" | "saved" | "error";
 
 export default function Home() {
+  const { isAdmin } = useUser();
   const [data, setData] = useState<CACData | null>(null);
   const [year, setYear] = useState<number>(INITIAL_YEAR);
   const [prod, setProd] = useState<Product>("cppem");
@@ -64,9 +66,9 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Debounced diff-based save
+  // Debounced diff-based save (admin only)
   useEffect(() => {
-    if (!data) return;
+    if (!data || !isAdmin) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
     saveTimerRef.current = setTimeout(async () => {
@@ -276,6 +278,7 @@ export default function Home() {
             comp={comp}
             accent={accent}
             onUpdate={updateField}
+            readOnly={!isAdmin}
           />
         </div>
 

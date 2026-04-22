@@ -9,6 +9,7 @@ interface DetailTableProps {
   comp: CACComputed;
   accent: string;
   onUpdate: (field: keyof ProductData, idx: number, value: number) => void;
+  readOnly?: boolean;
 }
 
 const thCls =
@@ -18,7 +19,7 @@ const tdLabelCls =
 const tdValCls =
   "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-fg-body";
 
-export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
+export function DetailTable({ d, comp, onUpdate, readOnly = false }: DetailTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-850 bg-surface-1">
       <div className="flex items-center justify-between px-5 pt-[18px]">
@@ -27,12 +28,16 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
             Detalhamento Mensal
           </div>
           <div className="mt-0.5 text-[11px] text-zinc-600">
-            Linhas calculadas automaticamente · campos amarelos são editáveis
+            {readOnly
+              ? "Modo visualização · apenas administradores podem editar"
+              : "Linhas calculadas automaticamente · campos amarelos são editáveis"}
           </div>
         </div>
-        <Tag color="#fbbf24" bg="rgba(251,191,36,0.1)">
-          ✎ Editável
-        </Tag>
+        {!readOnly && (
+          <Tag color="#fbbf24" bg="rgba(251,191,36,0.1)">
+            ✎ Editável
+          </Tag>
+        )}
       </div>
 
       <div className="overflow-x-auto pt-4">
@@ -60,6 +65,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                   <EditCell
                     value={v}
                     onChange={(val) => onUpdate("maxCAC", i, val)}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
@@ -143,6 +149,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                   <EditCell
                     value={v}
                     onChange={(val) => onUpdate("custoMkt", i, val)}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
@@ -162,6 +169,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                   <EditCell
                     value={v}
                     onChange={(val) => onUpdate("custoCom", i, val)}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
@@ -182,6 +190,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                     value={v}
                     onChange={(val) => onUpdate("clientes", i, val)}
                     width={66}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}

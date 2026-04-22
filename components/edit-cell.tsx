@@ -6,9 +6,10 @@ interface EditCellProps {
   value: number;
   onChange: (v: number) => void;
   width?: number;
+  readOnly?: boolean;
 }
 
-export function EditCell({ value, onChange, width = 82 }: EditCellProps) {
+export function EditCell({ value, onChange, width = 82, readOnly = false }: EditCellProps) {
   const [editing, setEditing] = useState(false);
   const [tmp, setTmp] = useState(String(value));
   const ref = useRef<HTMLInputElement>(null);
@@ -22,6 +23,17 @@ export function EditCell({ value, onChange, width = 82 }: EditCellProps) {
     setEditing(false);
     onChange(Number(tmp) || 0);
   };
+
+  if (readOnly) {
+    return (
+      <div
+        style={{ width, fontFeatureSettings: "'tnum'" }}
+        className="px-2 py-[5px] text-right text-[13px] text-fg-body"
+      >
+        {value ? value.toLocaleString("pt-BR") : "0"}
+      </div>
+    );
+  }
 
   if (editing) {
     return (

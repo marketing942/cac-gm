@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MONTHS, PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
 import type { MetasComputed } from "@/lib/metas";
+import { useUser } from "@/components/user-provider";
 import {
   computeMetas,
   createEmptyMetasData,
@@ -27,11 +28,13 @@ function EditableNumber({
   onChange,
   prefix,
   suffix,
+  readOnly = false,
 }: {
   value: number;
   onChange: (v: number) => void;
   prefix?: string;
   suffix?: string;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [tmp, setTmp] = useState(String(value));
@@ -46,6 +49,19 @@ function EditableNumber({
     setEditing(false);
     onChange(Number(tmp) || 0);
   };
+
+  if (readOnly) {
+    return (
+      <div
+        className="px-1 py-0.5 text-right text-[12px] text-fg-body"
+        style={{ fontFeatureSettings: "'tnum'" }}
+      >
+        {prefix}
+        {value ? value.toLocaleString("pt-BR") : "0"}
+        {suffix}
+      </div>
+    );
+  }
 
   if (editing) {
     return (
@@ -80,9 +96,11 @@ function EditableNumber({
 function EditablePct({
   value,
   onChange,
+  readOnly = false,
 }: {
   value: number;
   onChange: (v: number) => void;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [tmp, setTmp] = useState(String(Math.round(value * 100)));
@@ -97,6 +115,17 @@ function EditablePct({
     setEditing(false);
     onChange((Number(tmp) || 0) / 100);
   };
+
+  if (readOnly) {
+    return (
+      <div
+        className="px-1 py-0.5 text-right text-[12px] text-fg-body"
+        style={{ fontFeatureSettings: "'tnum'" }}
+      >
+        {fmtPctMetas(value)}
+      </div>
+    );
+  }
 
   if (editing) {
     return (
@@ -281,6 +310,7 @@ const ROWS: RowDef[] = [
 ];
 
 export default function MetasPage() {
+  const { isAdmin } = useUser();
   const [allData, setAllData] = useState<MetasAllData | null>(null);
   const [prod, setProd] = useState<Product>("cppem");
   const [year, setYear] = useState<number>(INITIAL_YEAR);
@@ -319,6 +349,7 @@ export default function MetasPage() {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
 
     saveTimerRef.current = setTimeout(async () => {
+      if (!isAdmin) return;
       const prev = lastSavedRef.current;
       const tasks: Promise<void>[] = [];
 
@@ -546,12 +577,14 @@ export default function MetasPage() {
                                   <EditablePct
                                     value={val}
                                     onChange={(v) => updateCell(row.field!, i, v)}
+                                    readOnly={!isAdmin}
                                   />
                                 ) : (
                                   <EditableNumber
                                     value={val}
                                     onChange={(v) => updateCell(row.field!, i, v)}
                                     prefix={row.type === "currency" ? "R$ " : undefined}
+                                    readOnly={!isAdmin}
                                   />
                                 )}
                               </div>
