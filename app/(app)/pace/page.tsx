@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
+import { PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
 import {
   PACE_CONFIG,
   MONTH_NAMES,
@@ -224,7 +224,7 @@ function StatRow({
 
 export default function PacePage() {
   const [data, setData] = useState<PaceAllData | null>(null);
-  const [year, setYear] = useState(CUR_YEAR);
+  const year = CUR_YEAR;
   const month = CUR_MONTH;
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -345,22 +345,6 @@ export default function PacePage() {
           </div>
         </div>
 
-        <div className="flex items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-          {YEARS.map((y) => (
-            <button
-              key={y}
-              onClick={() => setYear(y)}
-              className="rounded-md border-none px-3 py-[7px] text-[12px] font-bold transition-all duration-200"
-              style={{
-                background: year === y ? "#fbbf24" : "transparent",
-                color: year === y ? "#0a0a0a" : "#71717a",
-                cursor: "pointer",
-              }}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
       </header>
 
       <main className="mx-auto max-w-[1200px] px-4 py-6 sm:px-7">

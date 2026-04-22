@@ -1,6 +1,7 @@
 "use client";
 
-import { PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
+import { PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
+import { YearSelect } from "./year-select";
 
 interface HeaderProps {
   product: Product;
@@ -42,23 +43,7 @@ export function Header({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        {/* Year selector */}
-        <div className="flex items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-          {YEARS.map((y) => (
-            <button
-              key={y}
-              onClick={() => onYearChange(y)}
-              className="rounded-md border-none px-3 py-[7px] text-[12px] font-bold transition-all duration-200"
-              style={{
-                background: year === y ? meta.accent : "transparent",
-                color: year === y ? "#0a0a0a" : "#71717a",
-                cursor: "pointer",
-              }}
-            >
-              {y}
-            </button>
-          ))}
-        </div>
+        <YearSelect value={year} onChange={onYearChange} accent={meta.accent} />
 
         {/* Product selector */}
         <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">

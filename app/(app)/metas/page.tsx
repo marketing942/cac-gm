@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { MONTHS, PRODUCTS, PRODUCT_META, YEARS, type Product } from "@/lib/data";
+import { MONTHS, PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
+import { YearSelect } from "@/components/year-select";
 import type { MetasComputed } from "@/lib/metas";
 import { useUser } from "@/components/user-provider";
 import {
@@ -475,22 +476,7 @@ export default function MetasPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {YEARS.map((y) => (
-              <button
-                key={y}
-                onClick={() => setYear(y)}
-                className="rounded-md border-none px-3 py-[7px] text-[12px] font-bold transition-all duration-200"
-                style={{
-                  background: year === y ? meta.accent : "transparent",
-                  color: year === y ? "#0a0a0a" : "#71717a",
-                  cursor: "pointer",
-                }}
-              >
-                {y}
-              </button>
-            ))}
-          </div>
+          <YearSelect value={year} onChange={setYear} accent={meta.accent} />
           <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
             {PRODUCTS.map((p) => {
               const m = PRODUCT_META[p];
