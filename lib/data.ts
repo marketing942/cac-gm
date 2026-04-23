@@ -41,7 +41,7 @@ export const PRODUCT_META: Record<Product, ProductMeta> = {
     short: "CPPEM",
     accent: "#4ade80",
     accent2: "#22c55e",
-    logo: "/logos/cppem.svg",
+    logo: "/logos/cppem.png",
     badgeBg: "#050505",
   },
   colegio: {
@@ -49,7 +49,7 @@ export const PRODUCT_META: Record<Product, ProductMeta> = {
     short: "Colégio",
     accent: "#fbbf24",
     accent2: "#f59e0b",
-    logo: "/logos/colegio.svg",
+    logo: "/logos/colegio.png",
     badgeBg: "#0a1f3d",
   },
   unicv: {
@@ -57,7 +57,7 @@ export const PRODUCT_META: Record<Product, ProductMeta> = {
     short: "Unicive",
     accent: "#10b981",
     accent2: "#0d9488",
-    logo: "/logos/unicv.svg",
+    logo: "/logos/unicv.png",
     badgeBg: "#065f46",
   },
 };
