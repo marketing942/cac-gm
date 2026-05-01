@@ -29,9 +29,10 @@ import {
   REALIZADO_CHANNELS,
   type RealizadoAllData,
 } from "@/lib/realizado";
+import { GaugeChart } from "@/components/gauge-chart";
 
 type SyncState = "idle" | "saving" | "saved" | "error";
-type Tab = "desdobramento" | "realizado" | "comparativo";
+type Tab = "desdobramento" | "realizado" | "comparativo" | "progresso";
 
 const INITIAL_YEAR = 2026;
 
@@ -341,6 +342,17 @@ function fmtDelta(delta: number, type: "currency" | "number" | "percent"): strin
   return `${prefix}${Math.round(delta).toLocaleString("pt-BR")}`;
 }
 
+function fmtCompact(v: number, type: "currency" | "number" | "percent"): string {
+  if (type === "percent") return `${(v * 100).toFixed(0)}%`;
+  if (type === "currency") {
+    if (v >= 1_000_000)
+      return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
+    if (v >= 1000) return `R$ ${(v / 1000).toFixed(0)}k`;
+    return `R$ ${Math.round(v)}`;
+  }
+  return v.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+}
+
 /* ════════════════════════════════════════════════════════════ */
 
 export default function MetasPage() {
@@ -648,6 +660,7 @@ export default function MetasPage() {
     desdobramento: "Desdobramento",
     realizado: "Realizado",
     comparativo: "Comparativo",
+    progresso: "Progresso",
   };
 
   return (
@@ -677,7 +690,7 @@ export default function MetasPage() {
 
           {/* Tab selector */}
           <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {(["desdobramento", "realizado", "comparativo"] as Tab[]).map((t) => (
+            {(["desdobramento", "realizado", "comparativo", "progresso"] as Tab[]).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -693,27 +706,29 @@ export default function MetasPage() {
             ))}
           </div>
 
-          {/* Product selector */}
-          <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {PRODUCTS.map((p) => {
-              const m = PRODUCT_META[p];
-              const active = prod === p;
-              return (
-                <button
-                  key={p}
-                  onClick={() => setProd(p)}
-                  className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
-                  style={{
-                    background: active ? m.accent : "transparent",
-                    color: active ? "#0a0a0a" : "#71717a",
-                    cursor: "pointer",
-                  }}
-                >
-                  {m.short}
-                </button>
-              );
-            })}
-          </div>
+          {/* Product selector (hidden on progresso) */}
+          {tab !== "progresso" && (
+            <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
+              {PRODUCTS.map((p) => {
+                const m = PRODUCT_META[p];
+                const active = prod === p;
+                return (
+                  <button
+                    key={p}
+                    onClick={() => setProd(p)}
+                    className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
+                    style={{
+                      background: active ? m.accent : "transparent",
+                      color: active ? "#0a0a0a" : "#71717a",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {m.short}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </header>
 
@@ -1198,6 +1213,130 @@ export default function MetasPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* ── TAB: Progresso                           ── */}
+        {/* ═══════════════════════════════════════════════ */}
+        {tab === "progresso" && (
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            {PRODUCTS.map((p) => {
+              const pMeta = PRODUCT_META[p];
+              const pData = allData[p] ?? createEmptyMetasData();
+              const pComp = computeMetas(pData);
+              const pRd = realizadoData?.[p] ?? createEmptyRealizadoData(p);
+              const pRComp = computeRealizado(pRd);
+
+              const metrics = [
+                {
+                  key: "fat",
+                  label: "Faturamento",
+                  value: pRComp.anual.totalReceita,
+                  max: pComp.anual.valorVender,
+                  type: "currency" as const,
+                },
+                {
+                  key: "vendas",
+                  label: "Vendas",
+                  value: pRComp.anual.qtd,
+                  max: pComp.anual.vendasNecessarias,
+                  type: "number" as const,
+                },
+                {
+                  key: "leads",
+                  label: "Leads",
+                  value: pRComp.anual.leads,
+                  max: pComp.anual.qtdPago + pComp.anual.qtdOrganico,
+                  type: "number" as const,
+                },
+                {
+                  key: "ticket",
+                  label: "Ticket Médio",
+                  value: pRComp.anual.ticketMedio,
+                  max: pComp.anual.ticketMedio,
+                  type: "currency" as const,
+                },
+                {
+                  key: "conv",
+                  label: "Conversão",
+                  value: pRComp.anual.conversao,
+                  max: pComp.anual.conversao,
+                  type: "percent" as const,
+                },
+              ];
+
+              const main = metrics[0];
+              const secondary = metrics.slice(1);
+
+              return (
+                <div
+                  key={p}
+                  className="relative overflow-hidden rounded-2xl border border-zinc-850 bg-surface-1 p-6"
+                >
+                  {/* glow bg */}
+                  <div
+                    className="pointer-events-none absolute inset-0 opacity-[0.04]"
+                    style={{
+                      background: `radial-gradient(ellipse at 50% 30%, ${pMeta.accent}, transparent 70%)`,
+                    }}
+                  />
+
+                  {/* product header */}
+                  <div className="relative mb-5 flex items-center gap-3">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl border border-zinc-800 shadow-lg"
+                      style={{ background: pMeta.badgeBg }}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={pMeta.logo}
+                        alt={pMeta.label}
+                        className="h-full w-full object-contain"
+                      />
+                    </div>
+                    <div>
+                      <div
+                        className="text-[17px] font-extrabold tracking-tight"
+                        style={{ color: pMeta.accent }}
+                      >
+                        {pMeta.label}
+                      </div>
+                      <div className="text-[11px] font-medium text-zinc-600">
+                        Progresso {year}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* main gauge */}
+                  <div className="relative mb-4 flex justify-center">
+                    <GaugeChart
+                      value={main.value}
+                      max={main.max}
+                      label={main.label}
+                      sublabel={`${fmtCompact(main.value, main.type)} de ${fmtCompact(main.max, main.type)}`}
+                      color={pMeta.accent}
+                      size="lg"
+                    />
+                  </div>
+
+                  {/* secondary gauges */}
+                  <div className="relative grid grid-cols-2 gap-4 pt-2">
+                    {secondary.map((m) => (
+                      <GaugeChart
+                        key={m.key}
+                        value={m.value}
+                        max={m.max}
+                        label={m.label}
+                        sublabel={`${fmtCompact(m.value, m.type)} de ${fmtCompact(m.max, m.type)}`}
+                        color={pMeta.accent}
+                        size="sm"
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </main>
