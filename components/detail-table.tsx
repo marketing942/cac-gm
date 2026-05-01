@@ -9,6 +9,7 @@ interface DetailTableProps {
   comp: CACComputed;
   accent: string;
   onUpdate: (field: keyof ProductData, idx: number, value: number) => void;
+  readOnly?: boolean;
 }
 
 const thCls =
@@ -16,9 +17,9 @@ const thCls =
 const tdLabelCls =
   "whitespace-nowrap border-b border-zinc-900 px-3 py-2.5 text-[13px] font-semibold text-zinc-500";
 const tdValCls =
-  "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-zinc-300";
+  "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-fg-body";
 
-export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
+export function DetailTable({ d, comp, onUpdate, readOnly = false }: DetailTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-850 bg-surface-1">
       <div className="flex items-center justify-between px-5 pt-[18px]">
@@ -27,12 +28,16 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
             Detalhamento Mensal
           </div>
           <div className="mt-0.5 text-[11px] text-zinc-600">
-            Linhas calculadas automaticamente · campos amarelos são editáveis
+            {readOnly
+              ? "Modo visualização · apenas administradores podem editar"
+              : "Linhas calculadas automaticamente · campos amarelos são editáveis"}
           </div>
         </div>
-        <Tag color="#fbbf24" bg="rgba(251,191,36,0.1)">
-          ✎ Editável
-        </Tag>
+        {!readOnly && (
+          <Tag color="#fbbf24" bg="rgba(251,191,36,0.1)">
+            ✎ Editável
+          </Tag>
+        )}
       </div>
 
       <div className="overflow-x-auto pt-4">
@@ -51,20 +56,32 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
           <tbody>
             {/* Máximo CAC */}
             <tr>
-              <td className={tdLabelCls}>Máximo CAC</td>
+              <td className={tdLabelCls}>
+                Máximo CAC
+                <span className="ml-1.5 text-[9px] text-amber-400/70">●</span>
+              </td>
               {d.maxCAC.map((v, i) => (
-                <td key={i} className={tdValCls}>
-                  {fmt(v)}
+                <td key={i} className="border-b border-zinc-900 px-1 py-1.5">
+                  <EditCell
+                    value={v}
+                    onChange={(val) => onUpdate("maxCAC", i, val)}
+                    readOnly={readOnly}
+                  />
                 </td>
               ))}
               <td className={`${tdValCls} font-bold text-zinc-500`}>
-                {fmt(d.maxCAC.reduce((a, b) => a + b, 0) / 12)}
+                {(() => {
+                  const valid = d.maxCAC.filter((v) => v > 0);
+                  return valid.length
+                    ? fmt(valid.reduce((a, b) => a + b, 0) / valid.length)
+                    : "—";
+                })()}
               </td>
             </tr>
 
             {/* Real CAC */}
             <tr className="bg-white/[0.01]">
-              <td className={`${tdLabelCls} font-bold text-zinc-50`}>
+              <td className={`${tdLabelCls} font-bold text-fg`}>
                 Real CAC
               </td>
               {comp.realCAC.map((v, i) => {
@@ -132,6 +149,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                   <EditCell
                     value={v}
                     onChange={(val) => onUpdate("custoMkt", i, val)}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
@@ -151,6 +169,7 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                   <EditCell
                     value={v}
                     onChange={(val) => onUpdate("custoCom", i, val)}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
@@ -171,11 +190,12 @@ export function DetailTable({ d, comp, onUpdate }: DetailTableProps) {
                     value={v}
                     onChange={(val) => onUpdate("clientes", i, val)}
                     width={66}
+                    readOnly={readOnly}
                   />
                 </td>
               ))}
               <td
-                className={`${tdValCls} text-[15px] font-extrabold text-zinc-50`}
+                className={`${tdValCls} text-[15px] font-extrabold text-fg`}
               >
                 {comp.totalCli.toLocaleString("pt-BR")}
               </td>

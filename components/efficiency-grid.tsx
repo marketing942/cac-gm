@@ -15,32 +15,28 @@ export function EfficiencyGrid({ realCAC, maxCAC }: EfficiencyGridProps) {
         const over = r != null && r > maxCAC[i];
         const ok = r != null && !over;
 
+        const textColor = ok
+          ? "text-lime-600 dark:text-lime-400"
+          : over
+          ? "text-red-600 dark:text-red-400"
+          : "text-fg-muted";
+
         return (
           <div
             key={i}
-            className="flex h-[50px] w-[50px] flex-col items-center justify-center rounded-lg border transition-all duration-300"
-            style={{
-              background: ok
-                ? "rgba(163,230,53,0.08)"
+            className={[
+              "flex h-[50px] w-[50px] flex-col items-center justify-center rounded-lg border transition-all duration-300",
+              ok
+                ? "border-lime-500/30 bg-lime-500/10"
                 : over
-                ? "rgba(248,113,113,0.08)"
-                : "#18181b",
-              borderColor: ok
-                ? "rgba(163,230,53,0.15)"
-                : over
-                ? "rgba(248,113,113,0.15)"
-                : "#27272a",
-            }}
+                ? "border-red-500/30 bg-red-500/10"
+                : "border-zinc-850 bg-surface-2",
+            ].join(" ")}
           >
-            <span
-              className="text-[10px] font-bold"
-              style={{
-                color: ok ? "#a3e635" : over ? "#f87171" : "#3f3f46",
-              }}
-            >
+            <span className={["text-[10px] font-bold", textColor].join(" ")}>
               {m}
             </span>
-            <span className="mt-0.5 text-sm">
+            <span className={["mt-0.5 text-sm", textColor].join(" ")}>
               {ok ? "✓" : over ? "✗" : "·"}
             </span>
           </div>

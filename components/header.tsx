@@ -1,56 +1,71 @@
 "use client";
 
-import type { Product } from "@/lib/data";
+import { PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
+import { YearSelect } from "./year-select";
 
 interface HeaderProps {
   product: Product;
+  year: number;
   onProductChange: (p: Product) => void;
+  onYearChange: (y: number) => void;
 }
 
-export function Header({ product, onProductChange }: HeaderProps) {
-  const accent = product === "cppem" ? "#3b82f6" : "#a78bfa";
+export function Header({
+  product,
+  year,
+  onProductChange,
+  onYearChange,
+}: HeaderProps) {
+  const meta = PRODUCT_META[product];
 
   return (
     <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-900 bg-gradient-to-b from-white/[0.015] to-transparent px-7 py-5">
       <div className="flex items-center gap-3.5">
         <div
-          className="flex h-[38px] w-[38px] items-center justify-center rounded-lg text-[13px] font-black text-white"
-          style={{
-            background: `linear-gradient(135deg, ${accent}, ${accent}88)`,
-          }}
+          className="flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-lg border border-zinc-850 shadow-lg"
+          style={{ background: meta.badgeBg }}
         >
-          CAC
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={meta.logo}
+            alt={meta.label}
+            className="h-full w-full object-contain"
+          />
         </div>
         <div>
           <div className="text-[17px] font-extrabold tracking-tight">
-            Controle de CAC
+            {meta.label}
           </div>
           <div className="text-[11px] font-medium text-zinc-600">
-            GM Educação · 2026
+            Controle de CAC · {year}
           </div>
         </div>
       </div>
 
-      <div className="flex rounded-lg border border-zinc-800 bg-surface-2 p-[3px]">
-        {(["cppem", "unicv"] as const).map((p) => (
-          <button
-            key={p}
-            onClick={() => onProductChange(p)}
-            className="rounded-md border-none px-5 py-[7px] text-[13px] font-bold tracking-wide transition-all duration-200"
-            style={{
-              background:
-                product === p
-                  ? p === "cppem"
-                    ? "#3b82f6"
-                    : "#a78bfa"
-                  : "transparent",
-              color: product === p ? "#fff" : "#71717a",
-              cursor: "pointer",
-            }}
-          >
-            {p === "cppem" ? "CPPEM" : "UNICV"}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <YearSelect value={year} onChange={onYearChange} accent={meta.accent} />
+
+        {/* Product selector */}
+        <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
+          {PRODUCTS.map((p) => {
+            const m = PRODUCT_META[p];
+            const active = product === p;
+            return (
+              <button
+                key={p}
+                onClick={() => onProductChange(p)}
+                className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
+                style={{
+                  background: active ? m.accent : "transparent",
+                  color: active ? "#0a0a0a" : "#71717a",
+                  cursor: "pointer",
+                }}
+              >
+                {m.short}
+              </button>
+            );
+          })}
+        </div>
       </div>
     </header>
   );

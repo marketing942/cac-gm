@@ -1,0 +1,7 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="18" fill="#0a1f3d"/>
+  <path d="M60 14 L96 26 L96 60 Q96 90 60 106 Q24 90 24 60 L24 26 Z" fill="#122b52" stroke="#fbbf24" stroke-width="2.5"/>
+  <path d="M60 34 L78 40 L78 62 Q78 80 60 90 Q42 80 42 62 L42 40 Z" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0.7"/>
+  <text x="60" y="56" font-family="Outfit, system-ui, sans-serif" font-size="10" font-weight="800" fill="#fbbf24" text-anchor="middle" letter-spacing="1.5">COLÉGIO</text>
+  <text x="60" y="78" font-family="Outfit, system-ui, sans-serif" font-size="15" font-weight="900" fill="#fbbf24" text-anchor="middle" letter-spacing="1">CPPEM</text>
+</svg>

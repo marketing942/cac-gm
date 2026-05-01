@@ -1,5 +1,5 @@
 // ─── Types ───
-export type Product = "cppem" | "unicv";
+export type Product = "cppem" | "colegio" | "unicv";
 
 export interface ProductData {
   maxCAC: number[];
@@ -8,10 +8,8 @@ export interface ProductData {
   clientes: number[];
 }
 
-export interface CACData {
-  cppem: ProductData;
-  unicv: ProductData;
-}
+export type YearData = Record<Product, ProductData>;
+export type CACData = Record<number, YearData>;
 
 // ─── Constants ───
 export const MONTHS = [
@@ -24,19 +22,83 @@ export const MONTHS_FULL = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ] as const;
 
-// ─── Initial data (from spreadsheet CAC tab) ───
-export const INITIAL_DATA: CACData = {
+export const PRODUCTS: Product[] = ["cppem", "colegio", "unicv"];
+
+export const YEARS = [2026, 2027, 2028, 2029, 2030] as const;
+
+export interface ProductMeta {
+  label: string;
+  short: string;
+  accent: string;
+  accent2: string;
+  logo: string;
+  badgeBg: string;
+}
+
+export const PRODUCT_META: Record<Product, ProductMeta> = {
   cppem: {
-    maxCAC:   [180, 180, 210, 195, 180, 180, 225, 210, 180, 180, 150, 150],
-    custoMkt: [7011, 13853, 18202, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    custoCom: [5899, 9150, 12924, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    clientes: [177, 122, 188, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    label: "CPPEM",
+    short: "CPPEM",
+    accent: "#4ade80",
+    accent2: "#22c55e",
+    logo: "/logos/cppem.png",
+    badgeBg: "#050505",
+  },
+  colegio: {
+    label: "Colégio CPPEM",
+    short: "Colégio",
+    accent: "#fbbf24",
+    accent2: "#f59e0b",
+    logo: "/logos/colegio.png",
+    badgeBg: "#0a1f3d",
   },
   unicv: {
-    maxCAC:   [700, 840, 1050, 1015, 910, 700, 630, 1400, 840, 910, 1610, 770],
-    custoMkt: [5153, 6675, 8521, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    custoCom: [5010, 7800, 11115, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    clientes: [220, 121, 168, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    label: "Unicive",
+    short: "Unicive",
+    accent: "#10b981",
+    accent2: "#0d9488",
+    logo: "/logos/unicv.png",
+    badgeBg: "#065f46",
+  },
+};
+
+// ─── Empty data helpers ───
+function emptyProductData(): ProductData {
+  return {
+    maxCAC:   Array(12).fill(0),
+    custoMkt: Array(12).fill(0),
+    custoCom: Array(12).fill(0),
+    clientes: Array(12).fill(0),
+  };
+}
+
+export function createEmptyYear(): YearData {
+  return {
+    cppem: emptyProductData(),
+    colegio: emptyProductData(),
+    unicv: emptyProductData(),
+  };
+}
+
+// ─── Initial year ───
+export const INITIAL_YEAR = 2026;
+
+// ─── Initial data (from spreadsheet CAC tab, 2026) ───
+export const INITIAL_DATA: CACData = {
+  2026: {
+    cppem: {
+      maxCAC:   [180, 180, 210, 195, 180, 180, 225, 210, 180, 180, 150, 150],
+      custoMkt: [7011, 13853, 18202, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      custoCom: [5899, 9150, 12924, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      clientes: [177, 122, 188, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
+    colegio: emptyProductData(),
+    unicv: {
+      maxCAC:   [700, 840, 1050, 1015, 910, 700, 630, 1400, 840, 910, 1610, 770],
+      custoMkt: [5153, 6675, 8521, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      custoCom: [5010, 7800, 11115, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      clientes: [220, 121, 168, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    },
   },
 };
 
@@ -61,16 +123,19 @@ export function computeCAC(d: ProductData): CACComputed {
     c > 0 ? (d.custoMkt[i] + d.custoCom[i]) / c : null
   );
   const diff = realCAC.map((r, i) =>
-    r != null ? (r - d.maxCAC[i]) / d.maxCAC[i] : null
+    r != null && d.maxCAC[i] > 0 ? (r - d.maxCAC[i]) / d.maxCAC[i] : null
   );
   const active = realCAC.filter((v): v is number => v != null);
   const avgCAC = active.length ? active.reduce((a, b) => a + b, 0) / active.length : null;
-  const avgMax = d.maxCAC.reduce((a, b) => a + b, 0) / 12;
+  const validMax = d.maxCAC.filter((v) => v > 0);
+  const avgMax = validMax.length ? validMax.reduce((a, b) => a + b, 0) / validMax.length : 0;
   const totalCli = d.clientes.reduce((a, b) => a + b, 0);
   const totalMkt = d.custoMkt.reduce((a, b) => a + b, 0);
   const totalCom = d.custoCom.reduce((a, b) => a + b, 0);
   const totalInv = totalMkt + totalCom;
-  const overCount = realCAC.filter((r, i) => r != null && r > d.maxCAC[i]).length;
+  const overCount = realCAC.filter(
+    (r, i) => r != null && d.maxCAC[i] > 0 && r > d.maxCAC[i]
+  ).length;
   const okCount = active.length - overCount;
   const ceiling = Math.max(...d.maxCAC, ...active, 1) * 1.15;
 

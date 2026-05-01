@@ -1,0 +1,7 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <rect width="120" height="120" rx="18" fill="#065f46"/>
+  <rect x="38" y="30" width="14" height="28" fill="#fbbf24"/>
+  <path d="M38 58 L52 58 L52 72 Q52 78 46 78 Q38 78 38 70 Z" fill="#fbbf24"/>
+  <path d="M60 30 L74 30 L74 68 Q74 78 64 78 Q60 78 60 74 Z" fill="#ffffff"/>
+  <text x="60" y="102" font-family="Outfit, system-ui, sans-serif" font-size="12" font-weight="800" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">UNICIVE</text>
+</svg>
