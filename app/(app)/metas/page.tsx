@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MONTHS, PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
 import { YearSelect } from "@/components/year-select";
 import type { MetasComputed } from "@/lib/metas";
@@ -19,10 +19,23 @@ import {
   upsertMetas,
   type MetasAllData,
 } from "@/lib/metas-store";
+import {
+  loadRealizadoData,
+  upsertRealizado,
+} from "@/lib/realizado-store";
+import {
+  computeRealizado,
+  createEmptyRealizadoData,
+  REALIZADO_CHANNELS,
+  type RealizadoAllData,
+} from "@/lib/realizado";
 
 type SyncState = "idle" | "saving" | "saved" | "error";
+type Tab = "desdobramento" | "realizado" | "comparativo";
 
 const INITIAL_YEAR = 2026;
+
+/* ── Inline-editable cells ── */
 
 function EditableNumber({
   value,
@@ -156,6 +169,8 @@ function EditablePct({
   );
 }
 
+/* ── Chart ── */
+
 const CHART_W = 720;
 const CHART_H = 220;
 const CHART_PAD = { top: 30, right: 20, bottom: 28, left: 64 };
@@ -288,6 +303,8 @@ function getChartConfig(product: Product): { values: (comp: MetasComputed, d: Me
   };
 }
 
+/* ── Desdobramento row definitions ── */
+
 interface RowDef {
   key: string;
   label: string;
@@ -310,18 +327,39 @@ const ROWS: RowDef[] = [
   { key: "capacidade", label: "Capacidade de venda P/vendedor", editable: false, type: "currency", computedKey: "capacidadeVenda" },
 ];
 
+/* ── Comparativo helpers ── */
+
+function fmtDelta(delta: number, type: "currency" | "number" | "percent"): string {
+  const prefix = delta >= 0 ? "+" : "";
+  if (type === "currency") {
+    if (Math.abs(delta) >= 1000)
+      return `${prefix}R$ ${(delta / 1000).toFixed(1).replace(".", ",")}k`;
+    return `${prefix}R$ ${Math.round(delta).toLocaleString("pt-BR")}`;
+  }
+  if (type === "percent")
+    return `${prefix}${(delta * 100).toFixed(1)}pp`;
+  return `${prefix}${Math.round(delta).toLocaleString("pt-BR")}`;
+}
+
+/* ════════════════════════════════════════════════════════════ */
+
 export default function MetasPage() {
   const { isAdmin } = useUser();
   const [allData, setAllData] = useState<MetasAllData | null>(null);
+  const [realizadoData, setRealizadoData] = useState<RealizadoAllData | null>(null);
   const [prod, setProd] = useState<Product>("cppem");
   const [year, setYear] = useState<number>(INITIAL_YEAR);
+  const [tab, setTab] = useState<Tab>("desdobramento");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const lastSavedRef = useRef<MetasAllData | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedFlashRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rLastSavedRef = useRef<RealizadoAllData | null>(null);
+  const rSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  /* ── Load metas ── */
   useEffect(() => {
     (async () => {
       try {
@@ -345,6 +383,27 @@ export default function MetasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [year]);
 
+  /* ── Load realizado ── */
+  useEffect(() => {
+    (async () => {
+      try {
+        const rData = await loadRealizadoData(year);
+        rLastSavedRef.current = structuredClone(rData);
+        setRealizadoData(rData);
+      } catch (e) {
+        console.error("Failed to load realizado data", e);
+        const empty: RealizadoAllData = {
+          cppem: createEmptyRealizadoData("cppem"),
+          colegio: createEmptyRealizadoData("colegio"),
+          unicv: createEmptyRealizadoData("unicv"),
+        };
+        rLastSavedRef.current = structuredClone(empty);
+        setRealizadoData(empty);
+      }
+    })();
+  }, [year]);
+
+  /* ── Auto-save metas ── */
   useEffect(() => {
     if (!allData) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -378,12 +437,53 @@ export default function MetasPage() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [allData, year]);
+  }, [allData, year, isAdmin]);
 
+  /* ── Auto-save realizado ── */
+  useEffect(() => {
+    if (!realizadoData || !isAdmin) return;
+    if (rSaveTimerRef.current) clearTimeout(rSaveTimerRef.current);
+
+    rSaveTimerRef.current = setTimeout(async () => {
+      const prev = rLastSavedRef.current;
+      const tasks: Promise<void>[] = [];
+
+      PRODUCTS.forEach((p) => {
+        if (!prev || JSON.stringify(realizadoData[p]) !== JSON.stringify(prev[p])) {
+          tasks.push(upsertRealizado(p, year, realizadoData[p]));
+        }
+      });
+
+      if (tasks.length === 0) return;
+
+      setSyncState("saving");
+      try {
+        await Promise.all(tasks);
+        rLastSavedRef.current = structuredClone(realizadoData);
+        setSyncState("saved");
+        if (savedFlashRef.current) clearTimeout(savedFlashRef.current);
+        savedFlashRef.current = setTimeout(() => setSyncState("idle"), 1500);
+      } catch (e) {
+        console.error("Realizado save failed", e);
+        setSyncState("error");
+      }
+    }, 600);
+
+    return () => {
+      if (rSaveTimerRef.current) clearTimeout(rSaveTimerRef.current);
+    };
+  }, [realizadoData, year, isAdmin]);
+
+  /* ── Derived data ── */
   const d = allData?.[prod] ?? createEmptyMetasData();
   const comp = useMemo(() => computeMetas(d), [d]);
   const meta = PRODUCT_META[prod];
 
+  const rd = realizadoData?.[prod] ?? createEmptyRealizadoData(prod);
+  const rComp = useMemo(() => computeRealizado(rd), [rd]);
+  const channels = REALIZADO_CHANNELS[prod];
+
+  /* ── Metas cell updater ── */
   const updateCell = useCallback(
     (field: keyof MetasData, monthIdx: number, value: number) => {
       setAllData((prev) => {
@@ -396,6 +496,38 @@ export default function MetasPage() {
     [prod]
   );
 
+  /* ── Realizado updaters ── */
+  const updateRealizadoChannel = useCallback(
+    (channel: string, monthIdx: number, value: number) => {
+      setRealizadoData((prev) => {
+        if (!prev) return prev;
+        const chArr = [...(prev[prod].channels[channel] ?? Array(12).fill(0))];
+        chArr[monthIdx] = value;
+        return {
+          ...prev,
+          [prod]: {
+            ...prev[prod],
+            channels: { ...prev[prod].channels, [channel]: chArr },
+          },
+        };
+      });
+    },
+    [prod]
+  );
+
+  const updateRealizadoField = useCallback(
+    (field: "qtd" | "leads", monthIdx: number, value: number) => {
+      setRealizadoData((prev) => {
+        if (!prev) return prev;
+        const arr = [...prev[prod][field]];
+        arr[monthIdx] = value;
+        return { ...prev, [prod]: { ...prev[prod], [field]: arr } };
+      });
+    },
+    [prod]
+  );
+
+  /* ── Desdobramento helpers ── */
   function getMonthValue(row: RowDef, i: number): number {
     if (row.field) return d[row.field][i];
     if (row.computedKey) return comp[row.computedKey][i];
@@ -424,6 +556,60 @@ export default function MetasPage() {
     if (type === "percent") return fmtPctMetas(v);
     return fmtInt(v);
   }
+
+  /* ── Comparativo metrics ── */
+  const comparativoMetrics = useMemo(() => {
+    const metaLeads = d.qtdPago.map((v, i) => v + d.qtdOrganico[i]);
+    return [
+      {
+        key: "faturamento",
+        label: "Faturamento",
+        meta: d.valorVender,
+        real: rComp.totalReceita,
+        type: "currency" as const,
+        anualMeta: comp.anual.valorVender,
+        anualReal: rComp.anual.totalReceita,
+      },
+      {
+        key: "qtd",
+        label: "Qtd Vendas",
+        meta: comp.vendasNecessarias,
+        real: rd.qtd,
+        type: "number" as const,
+        anualMeta: comp.anual.vendasNecessarias,
+        anualReal: rComp.anual.qtd,
+      },
+      {
+        key: "leads",
+        label: "Leads",
+        meta: metaLeads,
+        real: rd.leads,
+        type: "number" as const,
+        anualMeta: comp.anual.qtdPago + comp.anual.qtdOrganico,
+        anualReal: rComp.anual.leads,
+      },
+      {
+        key: "ticket",
+        label: "Ticket Médio",
+        meta: d.ticketMedio,
+        real: rComp.ticketMedio,
+        type: "currency" as const,
+        anualMeta: comp.anual.ticketMedio,
+        anualReal: rComp.anual.ticketMedio,
+      },
+      {
+        key: "conversao",
+        label: "Conversão",
+        meta: d.conversao,
+        real: rComp.conversao,
+        type: "percent" as const,
+        anualMeta: comp.anual.conversao,
+        anualReal: rComp.anual.conversao,
+      },
+    ];
+  }, [d, comp, rd, rComp]);
+
+  /* ── Loading / Error states ── */
 
   if (loadError) {
     return (
@@ -454,8 +640,19 @@ export default function MetasPage() {
     );
   }
 
+  /* ════════════════════════════════════════════════════════════ */
+  /* ── RENDER                                                ── */
+  /* ════════════════════════════════════════════════════════════ */
+
+  const TAB_LABELS: Record<Tab, string> = {
+    desdobramento: "Desdobramento",
+    realizado: "Realizado",
+    comparativo: "Comparativo",
+  };
+
   return (
     <div className="min-h-screen bg-surface-0 text-fg">
+      {/* ── Header ── */}
       <header className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-900 bg-gradient-to-b from-white/[0.015] to-transparent px-7 py-5">
         <div className="flex items-center gap-3.5">
           <div
@@ -467,7 +664,7 @@ export default function MetasPage() {
           </div>
           <div>
             <div className="text-[17px] font-extrabold tracking-tight">
-              Desdobramento de Metas Anuais
+              Metas Anuais
             </div>
             <div className="text-[11px] font-medium text-zinc-600">
               {meta.label} · {year}
@@ -477,6 +674,26 @@ export default function MetasPage() {
 
         <div className="flex flex-wrap items-center gap-3">
           <YearSelect value={year} onChange={setYear} accent={meta.accent} />
+
+          {/* Tab selector */}
+          <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
+            {(["desdobramento", "realizado", "comparativo"] as Tab[]).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
+                style={{
+                  background: tab === t ? meta.accent : "transparent",
+                  color: tab === t ? "#0a0a0a" : "#71717a",
+                  cursor: "pointer",
+                }}
+              >
+                {TAB_LABELS[t]}
+              </button>
+            ))}
+          </div>
+
+          {/* Product selector */}
           <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
             {PRODUCTS.map((p) => {
               const m = PRODUCT_META[p];
@@ -501,152 +718,493 @@ export default function MetasPage() {
       </header>
 
       <main className="space-y-6 px-4 py-6 sm:px-7">
-        <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
-          <table className="w-full min-w-[1100px] text-[12px]">
-            <thead>
-              <tr className="border-b border-zinc-850">
-                <th className="sticky left-0 z-10 bg-surface-1 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[1px] text-zinc-500">
-                  Indicador
-                </th>
-                {MONTHS.map((m) => (
-                  <th
-                    key={m}
-                    className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500"
-                    style={{ minWidth: 80 }}
-                  >
-                    {m}
+        {/* ═══════════════════════════════════════════════ */}
+        {/* ── TAB: Desdobramento                       ── */}
+        {/* ═══════════════════════════════════════════════ */}
+        {tab === "desdobramento" && (
+          <>
+            <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
+              <table className="w-full min-w-[1100px] text-[12px]">
+                <thead>
+                  <tr className="border-b border-zinc-850">
+                    <th className="sticky left-0 z-10 bg-surface-1 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[1px] text-zinc-500">
+                      Indicador
+                    </th>
+                    {MONTHS.map((m) => (
+                      <th
+                        key={m}
+                        className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500"
+                        style={{ minWidth: 80 }}
+                      >
+                        {m}
+                      </th>
+                    ))}
+                    <th
+                      className="border-l border-zinc-850 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[1px]"
+                      style={{ color: meta.accent, minWidth: 100 }}
+                    >
+                      Ano
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ROWS.map((row, ri) => {
+                    const isSeparator = row.key === "conversao" || row.key === "vendas";
+                    return (
+                      <tr
+                        key={row.key}
+                        className={[
+                          "border-b border-zinc-850 last:border-0",
+                          isSeparator ? "border-t-2 border-t-zinc-800" : "",
+                          ri % 2 === 0 ? "" : "bg-surface-0/30",
+                        ].join(" ")}
+                      >
+                        <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                          {row.label}
+                        </td>
+                        {MONTHS.map((_, i) => {
+                          const val = getMonthValue(row, i);
+                          const annualVal = getAnnualValue(row);
+                          const showLeadPct =
+                            (row.key === "pago" || row.key === "organico") &&
+                            comp.leadsNecessario[i] > 0;
+                          const leadPct = showLeadPct
+                            ? Math.round((val / comp.leadsNecessario[i]) * 100)
+                            : 0;
+                          const showAnnualPct =
+                            row.type !== "percent" && annualVal > 0 && val > 0;
+                          const annualPct = showAnnualPct
+                            ? Math.round((val / annualVal) * 100)
+                            : 0;
+                          return (
+                            <td key={i} className="px-1.5 py-1.5">
+                              {row.editable && row.field ? (
+                                <div className="flex items-center gap-1">
+                                  <div className="flex-1">
+                                    {row.type === "percent" ? (
+                                      <EditablePct
+                                        value={val}
+                                        onChange={(v) => updateCell(row.field!, i, v)}
+                                        readOnly={!isAdmin}
+                                      />
+                                    ) : (
+                                      <EditableNumber
+                                        value={val}
+                                        onChange={(v) => updateCell(row.field!, i, v)}
+                                        prefix={row.type === "currency" ? "R$ " : undefined}
+                                        readOnly={!isAdmin}
+                                      />
+                                    )}
+                                  </div>
+                                  <div className="flex flex-col items-end gap-0">
+                                    {showAnnualPct && (
+                                      <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
+                                        {annualPct}%
+                                      </span>
+                                    )}
+                                    {showLeadPct && (
+                                      <span className="whitespace-nowrap text-[9px] font-bold text-fg-muted">
+                                        {leadPct}%
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-1">
+                                  <div
+                                    className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
+                                    style={{ fontFeatureSettings: "'tnum'" }}
+                                  >
+                                    {formatValue(val, row.type)}
+                                  </div>
+                                  {showAnnualPct && (
+                                    <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
+                                      {annualPct}%
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="border-l border-zinc-850 px-2 py-1.5">
+                          <div
+                            className="flex items-center justify-end gap-1 rounded px-1 py-0.5 text-right text-[12px] font-bold"
+                            style={{
+                              fontFeatureSettings: "'tnum'",
+                              color: meta.accent,
+                            }}
+                          >
+                            {formatValue(getAnnualValue(row), row.type)}
+                            {(row.key === "pago" || row.key === "organico") &&
+                              comp.anual.leadsNecessario > 0 && (
+                                <span className="text-[9px] font-bold text-fg-muted">
+                                  {Math.round(
+                                    (getAnnualValue(row) / comp.anual.leadsNecessario) * 100
+                                  )}
+                                  %
+                                </span>
+                              )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {(() => {
+              const chartCfg = getChartConfig(prod);
+              return (
+                <MetasLineChart
+                  values={chartCfg.values(comp, d)}
+                  label={`${meta.label} · ${chartCfg.label}`}
+                  color={meta.accent}
+                  unit={chartCfg.unit}
+                />
+              );
+            })()}
+          </>
+        )}
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* ── TAB: Realizado                           ── */}
+        {/* ═══════════════════════════════════════════════ */}
+        {tab === "realizado" && (
+          <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
+            <table className="w-full min-w-[1100px] text-[12px]">
+              <thead>
+                <tr className="border-b border-zinc-850">
+                  <th className="sticky left-0 z-10 bg-surface-1 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[1px] text-zinc-500">
+                    Canal / Indicador
                   </th>
-                ))}
-                <th
-                  className="border-l border-zinc-850 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[1px]"
-                  style={{ color: meta.accent, minWidth: 100 }}
-                >
-                  Ano
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {ROWS.map((row, ri) => {
-                const isSeparator = row.key === "conversao" || row.key === "vendas";
-                return (
+                  {MONTHS.map((m) => (
+                    <th
+                      key={m}
+                      className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500"
+                      style={{ minWidth: 80 }}
+                    >
+                      {m}
+                    </th>
+                  ))}
+                  <th
+                    className="border-l border-zinc-850 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[1px]"
+                    style={{ color: meta.accent, minWidth: 100 }}
+                  >
+                    Ano
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Revenue per channel (editable) */}
+                {channels.map((ch, ci) => (
                   <tr
-                    key={row.key}
+                    key={ch}
                     className={[
-                      "border-b border-zinc-850 last:border-0",
-                      isSeparator ? "border-t-2 border-t-zinc-800" : "",
-                      ri % 2 === 0 ? "" : "bg-surface-0/30",
+                      "border-b border-zinc-850",
+                      ci % 2 !== 0 ? "bg-surface-0/30" : "",
                     ].join(" ")}
                   >
                     <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
-                      {row.label}
+                      {ch}
                     </td>
-                    {MONTHS.map((_, i) => {
-                      const val = getMonthValue(row, i);
-                      const annualVal = getAnnualValue(row);
-                      const showLeadPct =
-                        (row.key === "pago" || row.key === "organico") &&
-                        comp.leadsNecessario[i] > 0;
-                      const leadPct = showLeadPct
-                        ? Math.round((val / comp.leadsNecessario[i]) * 100)
-                        : 0;
-                      const showAnnualPct =
-                        row.type !== "percent" && annualVal > 0 && val > 0;
-                      const annualPct = showAnnualPct
-                        ? Math.round((val / annualVal) * 100)
-                        : 0;
-                      return (
-                        <td key={i} className="px-1.5 py-1.5">
-                          {row.editable && row.field ? (
-                            <div className="flex items-center gap-1">
-                              <div className="flex-1">
-                                {row.type === "percent" ? (
-                                  <EditablePct
-                                    value={val}
-                                    onChange={(v) => updateCell(row.field!, i, v)}
-                                    readOnly={!isAdmin}
-                                  />
-                                ) : (
-                                  <EditableNumber
-                                    value={val}
-                                    onChange={(v) => updateCell(row.field!, i, v)}
-                                    prefix={row.type === "currency" ? "R$ " : undefined}
-                                    readOnly={!isAdmin}
-                                  />
-                                )}
-                              </div>
-                              <div className="flex flex-col items-end gap-0">
-                                {showAnnualPct && (
-                                  <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
-                                    {annualPct}%
-                                  </span>
-                                )}
-                                {showLeadPct && (
-                                  <span className="whitespace-nowrap text-[9px] font-bold text-fg-muted">
-                                    {leadPct}%
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end gap-1">
-                              <div
-                                className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
-                                style={{ fontFeatureSettings: "'tnum'" }}
-                              >
-                                {formatValue(val, row.type)}
-                              </div>
-                              {showAnnualPct && (
-                                <span className="whitespace-nowrap text-[8px] font-semibold text-zinc-500">
-                                  {annualPct}%
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </td>
-                      );
-                    })}
+                    {MONTHS.map((_, i) => (
+                      <td key={i} className="px-1.5 py-1.5">
+                        <EditableNumber
+                          value={rd.channels[ch]?.[i] ?? 0}
+                          onChange={(v) => updateRealizadoChannel(ch, i, v)}
+                          prefix="R$ "
+                          readOnly={!isAdmin}
+                        />
+                      </td>
+                    ))}
                     <td className="border-l border-zinc-850 px-2 py-1.5">
                       <div
-                        className="flex items-center justify-end gap-1 rounded px-1 py-0.5 text-right text-[12px] font-bold"
-                        style={{
-                          fontFeatureSettings: "'tnum'",
-                          color: meta.accent,
-                        }}
+                        className="px-1 py-0.5 text-right text-[12px] font-bold"
+                        style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
                       >
-                        {formatValue(getAnnualValue(row), row.type)}
-                        {(row.key === "pago" || row.key === "organico") &&
-                          comp.anual.leadsNecessario > 0 && (
-                            <span className="text-[9px] font-bold text-fg-muted">
-                              {Math.round(
-                                (getAnnualValue(row) / comp.anual.leadsNecessario) * 100
-                              )}
-                              %
-                            </span>
-                          )}
+                        {fmtBRLMetas(rComp.anual.channels[ch] ?? 0)}
                       </div>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                ))}
 
-        {(() => {
-          const chartCfg = getChartConfig(prod);
-          return (
-            <MetasLineChart
-              values={chartCfg.values(comp, d)}
-              label={`${meta.label} · ${chartCfg.label}`}
-              color={meta.accent}
-              unit={chartCfg.unit}
-            />
-          );
-        })()}
+                {/* Total Receita (computed) */}
+                <tr className="border-b border-t-2 border-zinc-850 border-t-zinc-700">
+                  <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-bold text-fg">
+                    Total Receita
+                  </td>
+                  {rComp.totalReceita.map((v, i) => (
+                    <td key={i} className="px-1.5 py-1.5">
+                      <div
+                        className="px-1 py-0.5 text-right text-[12px] font-semibold text-fg"
+                        style={{ fontFeatureSettings: "'tnum'" }}
+                      >
+                        {v > 0 ? fmtBRLMetas(v) : "—"}
+                      </div>
+                    </td>
+                  ))}
+                  <td className="border-l border-zinc-850 px-2 py-1.5">
+                    <div
+                      className="px-1 py-0.5 text-right text-[12px] font-bold"
+                      style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                    >
+                      {fmtBRLMetas(rComp.anual.totalReceita)}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Qtd Vendas (editable) */}
+                <tr className="border-b border-zinc-850 bg-surface-0/30">
+                  <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                    Qtd Vendas
+                  </td>
+                  {rd.qtd.map((v, i) => (
+                    <td key={i} className="px-1.5 py-1.5">
+                      <EditableNumber
+                        value={v}
+                        onChange={(nv) => updateRealizadoField("qtd", i, nv)}
+                        readOnly={!isAdmin}
+                      />
+                    </td>
+                  ))}
+                  <td className="border-l border-zinc-850 px-2 py-1.5">
+                    <div
+                      className="px-1 py-0.5 text-right text-[12px] font-bold"
+                      style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                    >
+                      {fmtInt(rComp.anual.qtd)}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Leads (editable) */}
+                <tr className="border-b border-zinc-850">
+                  <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                    Leads
+                  </td>
+                  {rd.leads.map((v, i) => (
+                    <td key={i} className="px-1.5 py-1.5">
+                      <EditableNumber
+                        value={v}
+                        onChange={(nv) => updateRealizadoField("leads", i, nv)}
+                        readOnly={!isAdmin}
+                      />
+                    </td>
+                  ))}
+                  <td className="border-l border-zinc-850 px-2 py-1.5">
+                    <div
+                      className="px-1 py-0.5 text-right text-[12px] font-bold"
+                      style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                    >
+                      {fmtInt(rComp.anual.leads)}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Ticket Médio (computed) */}
+                <tr className="border-b border-zinc-850 bg-surface-0/30">
+                  <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                    Ticket Médio
+                  </td>
+                  {rComp.ticketMedio.map((v, i) => (
+                    <td key={i} className="px-1.5 py-1.5">
+                      <div
+                        className="px-1 py-0.5 text-right text-[12px] text-fg"
+                        style={{ fontFeatureSettings: "'tnum'" }}
+                      >
+                        {v > 0 ? fmtBRLMetas(v) : "—"}
+                      </div>
+                    </td>
+                  ))}
+                  <td className="border-l border-zinc-850 px-2 py-1.5">
+                    <div
+                      className="px-1 py-0.5 text-right text-[12px] font-bold"
+                      style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                    >
+                      {rComp.anual.ticketMedio > 0 ? fmtBRLMetas(rComp.anual.ticketMedio) : "—"}
+                    </div>
+                  </td>
+                </tr>
+
+                {/* Conversão (computed) */}
+                <tr>
+                  <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                    Conversão
+                  </td>
+                  {rComp.conversao.map((v, i) => (
+                    <td key={i} className="px-1.5 py-1.5">
+                      <div
+                        className="px-1 py-0.5 text-right text-[12px] text-fg"
+                        style={{ fontFeatureSettings: "'tnum'" }}
+                      >
+                        {v > 0 ? fmtPctMetas(v) : "—"}
+                      </div>
+                    </td>
+                  ))}
+                  <td className="border-l border-zinc-850 px-2 py-1.5">
+                    <div
+                      className="px-1 py-0.5 text-right text-[12px] font-bold"
+                      style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                    >
+                      {rComp.anual.conversao > 0 ? fmtPctMetas(rComp.anual.conversao) : "—"}
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ═══════════════════════════════════════════════ */}
+        {/* ── TAB: Comparativo                         ── */}
+        {/* ═══════════════════════════════════════════════ */}
+        {tab === "comparativo" && (
+          <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
+            <table className="w-full min-w-[1100px] text-[12px]">
+              <thead>
+                <tr className="border-b border-zinc-850">
+                  <th className="sticky left-0 z-10 bg-surface-1 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[1px] text-zinc-500">
+                    Indicador
+                  </th>
+                  {MONTHS.map((m) => (
+                    <th
+                      key={m}
+                      className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500"
+                      style={{ minWidth: 80 }}
+                    >
+                      {m}
+                    </th>
+                  ))}
+                  <th
+                    className="border-l border-zinc-850 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[1px]"
+                    style={{ color: meta.accent, minWidth: 100 }}
+                  >
+                    Ano
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {comparativoMetrics.map((metric, mi) => (
+                  <React.Fragment key={metric.key}>
+                    {/* Meta row */}
+                    <tr
+                      className={[
+                        "border-b border-zinc-850",
+                        mi > 0 ? "border-t-2 border-t-zinc-800" : "",
+                      ].join(" ")}
+                    >
+                      <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2 text-[12px]">
+                        <span className="font-bold text-fg">{metric.label}</span>
+                        <span className="ml-2 text-[10px] font-semibold text-zinc-500">Meta</span>
+                      </td>
+                      {metric.meta.map((v, i) => (
+                        <td key={i} className="px-1.5 py-1.5">
+                          <div
+                            className="px-1 py-0.5 text-right text-[12px] text-fg-body"
+                            style={{ fontFeatureSettings: "'tnum'" }}
+                          >
+                            {v > 0 ? formatValue(v, metric.type) : "—"}
+                          </div>
+                        </td>
+                      ))}
+                      <td className="border-l border-zinc-850 px-2 py-1.5">
+                        <div
+                          className="px-1 py-0.5 text-right text-[12px] font-bold text-fg-body"
+                          style={{ fontFeatureSettings: "'tnum'" }}
+                        >
+                          {metric.anualMeta > 0 ? formatValue(metric.anualMeta, metric.type) : "—"}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Real row */}
+                    <tr className="border-b border-zinc-850 bg-surface-0/20">
+                      <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2">
+                        <span className="ml-5 text-[10px] font-semibold text-zinc-400">Real</span>
+                      </td>
+                      {metric.real.map((v, i) => (
+                        <td key={i} className="px-1.5 py-1.5">
+                          <div
+                            className="px-1 py-0.5 text-right text-[12px] text-fg"
+                            style={{ fontFeatureSettings: "'tnum'" }}
+                          >
+                            {v > 0 ? formatValue(v, metric.type) : "—"}
+                          </div>
+                        </td>
+                      ))}
+                      <td className="border-l border-zinc-850 px-2 py-1.5">
+                        <div
+                          className="px-1 py-0.5 text-right text-[12px] font-bold"
+                          style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                        >
+                          {metric.anualReal > 0 ? formatValue(metric.anualReal, metric.type) : "—"}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Delta row */}
+                    <tr className="border-b border-zinc-850 bg-surface-0/10">
+                      <td className="sticky left-0 z-10 bg-surface-1 px-4 py-1.5">
+                        <span className="ml-5 text-[10px] font-semibold text-zinc-600">&Delta;</span>
+                      </td>
+                      {metric.real.map((realV, i) => {
+                        const metaV = metric.meta[i];
+                        const hasBoth = realV > 0 || metaV > 0;
+                        const delta = realV - metaV;
+                        return (
+                          <td key={i} className="px-1.5 py-1">
+                            {hasBoth ? (
+                              <div
+                                className="px-1 py-0.5 text-right text-[11px] font-bold"
+                                style={{
+                                  fontFeatureSettings: "'tnum'",
+                                  color: delta >= 0 ? "#a3e635" : "#f87171",
+                                }}
+                              >
+                                {fmtDelta(delta, metric.type)}
+                              </div>
+                            ) : (
+                              <div className="px-1 py-0.5 text-right text-[11px] text-zinc-600">
+                                —
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="border-l border-zinc-850 px-2 py-1">
+                        {(metric.anualReal > 0 || metric.anualMeta > 0) ? (
+                          <div
+                            className="px-1 py-0.5 text-right text-[11px] font-bold"
+                            style={{
+                              fontFeatureSettings: "'tnum'",
+                              color:
+                                metric.anualReal - metric.anualMeta >= 0
+                                  ? "#a3e635"
+                                  : "#f87171",
+                            }}
+                          >
+                            {fmtDelta(metric.anualReal - metric.anualMeta, metric.type)}
+                          </div>
+                        ) : (
+                          <div className="px-1 py-0.5 text-right text-[11px] text-zinc-600">
+                            —
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  </React.Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </main>
 
+      {/* ── Footer ── */}
       <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-zinc-900 px-7 py-3.5 text-[10px] text-zinc-700">
-        <span>GM Educação · Desdobramento de Metas Anuais</span>
+        <span>GM Educação · Metas Anuais</span>
         <span className="flex items-center gap-2">
           <span>Cálculos em tempo real · Dados compartilhados</span>
           <span
