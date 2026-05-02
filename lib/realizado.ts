@@ -11,7 +11,7 @@ export type RealizadoAllData = Record<Product, RealizadoData>;
 export const REALIZADO_CHANNELS: Record<Product, string[]> = {
   cppem: ["Digitais e Online", "Presenciais", "Supletivo", "Físicos", "Mentoria"],
   colegio: ["Ensino Fundamental", "Ensino Médio", "Outros"],
-  unicv: ["Tecnólogo", "Pós", "Outros"],
+  unicv: ["Matrículas e Bolsas R$"],
 };
 
 export interface RealizadoComputed {

@@ -45,11 +45,11 @@ export function GaugeChart({
   const clamped = Math.min(Math.max(pct, 0), 1);
   const displayPct = Math.round(pct * 100);
 
-  const W = 200;
+  const W = 220;
   const cx = W / 2;
   const cy = W / 2;
-  const sw = size === "lg" ? 20 : 14;
-  const r = (W - sw) / 2 - 6;
+  const sw = size === "lg" ? 18 : 12;
+  const r = (W - sw) / 2 - 20;
 
   const bgPath = arc(START, START + SWEEP, r, cx, cy);
   const fillAngle = SWEEP * clamped;
@@ -57,21 +57,21 @@ export function GaugeChart({
     fillAngle > 0.5 ? arc(START, START + fillAngle, r, cx, cy) : "";
 
   const textY = cy + (size === "lg" ? 4 : 2);
-  const subY = textY + (size === "lg" ? 24 : 17);
-  const pctFS = size === "lg" ? 44 : 28;
-  const subFS = size === "lg" ? 12 : 9.5;
+  const subY = textY + (size === "lg" ? 22 : 16);
+  const pctFS = size === "lg" ? 38 : 24;
+  const subFS = size === "lg" ? 11 : 9;
 
   return (
     <div className="flex flex-col items-center">
       <svg
-        viewBox={`0 16 ${W} ${W * 0.65}`}
+        viewBox={`0 0 ${W} ${cy + r * 0.75 + sw}`}
         className={
-          size === "lg" ? "w-full max-w-[280px]" : "w-full max-w-[150px]"
+          size === "lg" ? "w-full max-w-[260px]" : "w-full max-w-[140px]"
         }
       >
         <defs>
-          <filter id={`gl${uid}`}>
-            <feGaussianBlur stdDeviation="6" result="b" />
+          <filter id={`gl${uid}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="4" result="b" />
             <feMerge>
               <feMergeNode in="b" />
               <feMergeNode in="SourceGraphic" />
@@ -132,7 +132,7 @@ export function GaugeChart({
       <div
         className={[
           "text-center font-bold text-zinc-400",
-          size === "lg" ? "-mt-1 text-[15px]" : "-mt-1 text-[12px]",
+          size === "lg" ? "mt-0 text-[15px]" : "mt-0 text-[12px]",
         ].join(" ")}
       >
         {label}
