@@ -2,12 +2,30 @@ import type { Product } from "./data";
 
 export interface MetasData {
   valorVender: number[];
+  receitaCategorias?: Record<string, number[]>;
   qtdPago: number[];
   qtdOrganico: number[];
   conversao: number[];
   ticketMedio: number[];
   leadsMaxVendedor: number[];
 }
+
+export type MetasNumericField = Exclude<keyof MetasData, "receitaCategorias">;
+
+export interface MetasCategoryDef {
+  key: string;
+  label: string;
+  realizadoChannel: string;
+}
+
+export const METAS_REVENUE_CATEGORIES: Partial<Record<Product, MetasCategoryDef[]>> = {
+  cppem: [
+    { key: "Presenciais", label: "Presenciais", realizadoChannel: "Presenciais" },
+    { key: "Digitais + Online", label: "Digitais + Online", realizadoChannel: "Digitais e Online" },
+    { key: "Mentoria", label: "Mentoria", realizadoChannel: "Mentoria" },
+    { key: "Físicos", label: "Físicos", realizadoChannel: "Físicos" },
+  ],
+};
 
 export interface MetasComputed {
   leadsNecessario: number[];
