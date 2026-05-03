@@ -34,11 +34,15 @@ export async function loadRealizadoData(
       for (const ch of REALIZADO_CHANNELS[p]) {
         channels[ch] = raw.channels?.[ch] ?? Array(12).fill(0);
       }
-      out[p] = {
+      const loaded: RealizadoData = {
         channels,
         qtd: raw.qtd ?? Array(12).fill(0),
         leads: raw.leads ?? Array(12).fill(0),
       };
+      if (p === "unicv") {
+        loaded.mensalidade = raw.mensalidade ?? Array(12).fill(0);
+      }
+      out[p] = loaded;
     }
   }
 

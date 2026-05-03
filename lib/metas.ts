@@ -1,8 +1,21 @@
 import type { Product } from "./data";
 
+export interface MensalidadeConfig {
+  baseAlunos: number;
+  ticketMensalidade: number;
+  churnPct: number;
+}
+
+export const DEFAULT_MENSALIDADE_CONFIG: MensalidadeConfig = {
+  baseAlunos: 850,
+  ticketMensalidade: 37,
+  churnPct: 0.05,
+};
+
 export interface MetasData {
   valorVender: number[];
   receitaCategorias?: Record<string, number[]>;
+  mensalidadeConfig?: MensalidadeConfig;
   qtdPago: number[];
   qtdOrganico: number[];
   conversao: number[];
@@ -10,7 +23,10 @@ export interface MetasData {
   leadsMaxVendedor: number[];
 }
 
-export type MetasNumericField = Exclude<keyof MetasData, "receitaCategorias">;
+export type MetasNumericField = Exclude<
+  keyof MetasData,
+  "receitaCategorias" | "mensalidadeConfig"
+>;
 
 export interface MetasCategoryDef {
   key: string;
@@ -32,6 +48,8 @@ export interface MetasComputed {
   vendasNecessarias: number[];
   vendedoresNecessarios: number[];
   capacidadeVenda: number[];
+  alunosAtivos: number[];
+  repasse: number[];
   anual: {
     valorVender: number;
     leadsNecessario: number;
@@ -43,6 +61,8 @@ export interface MetasComputed {
     leadsMaxVendedor: number;
     vendedoresNecessarios: number;
     capacidadeVenda: number;
+    alunosAtivos: number;
+    repasse: number;
   };
 }
 
@@ -71,6 +91,36 @@ export function computeMetas(d: MetasData): MetasComputed {
     (lm, i) => lm * d.conversao[i] * d.ticketMedio[i]
   );
 
+  // Mensalidade (Unicive)
+  const cfg = d.mensalidadeConfig;
+  const alunosAtivos: number[] = Array(12).fill(0);
+  const repasse: number[] = Array(12).fill(0);
+
+  if (cfg && cfg.baseAlunos > 0) {
+    const pagantes: number[] = [];
+    for (let i = 0; i < 12; i++) {
+      if (i === 0) {
+        alunosAtivos[i] = cfg.baseAlunos + vendasNecessarias[i];
+      } else {
+        alunosAtivos[i] =
+          Math.round(alunosAtivos[i - 1] * (1 - cfg.churnPct)) +
+          vendasNecessarias[i];
+      }
+
+      if (i === 0) {
+        pagantes[i] = cfg.baseAlunos;
+      } else if (i === 1) {
+        pagantes[i] = Math.round(pagantes[i - 1] * (1 - cfg.churnPct));
+      } else {
+        pagantes[i] =
+          Math.round(pagantes[i - 1] * (1 - cfg.churnPct)) +
+          vendasNecessarias[i - 2];
+      }
+
+      repasse[i] = Math.round(pagantes[i] * cfg.ticketMensalidade);
+    }
+  }
+
   const totalLeads = sum(leadsNecessario);
   const totalVendas = sum(vendasNecessarias);
   const totalValor = sum(d.valorVender);
@@ -86,9 +136,19 @@ export function computeMetas(d: MetasData): MetasComputed {
     leadsMaxVendedor: Math.round(avg(d.leadsMaxVendedor)),
     vendedoresNecessarios: Math.max(...vendedoresNecessarios, 0),
     capacidadeVenda: Math.round(avg(capacidadeVenda)),
+    alunosAtivos: alunosAtivos[11] ?? 0,
+    repasse: sum(repasse),
   };
 
-  return { leadsNecessario, vendasNecessarias, vendedoresNecessarios, capacidadeVenda, anual };
+  return {
+    leadsNecessario,
+    vendasNecessarias,
+    vendedoresNecessarios,
+    capacidadeVenda,
+    alunosAtivos,
+    repasse,
+    anual,
+  };
 }
 
 function emptyMonths(): number[] {
@@ -123,6 +183,11 @@ export const METAS_INITIAL: Record<Product, MetasData> = {
     conversao: [0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.12, 0.15, 0.12],
     ticketMedio: [100, 150, 130, 100, 100, 100, 100, 100, 100, 100, 50, 100],
     leadsMaxVendedor: [700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700, 700],
+    mensalidadeConfig: {
+      baseAlunos: 850,
+      ticketMensalidade: 37,
+      churnPct: 0.05,
+    },
   },
 };
 
