@@ -175,7 +175,14 @@ export const METAS_INITIAL: Record<Product, MetasData> = {
     ticketMedio: [600, 600, 700, 650, 600, 600, 750, 700, 600, 600, 500, 500],
     leadsMaxVendedor: [600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600, 600],
   },
-  colegio: createEmptyMetasData(),
+  colegio: {
+    ...createEmptyMetasData(),
+    mensalidadeConfig: {
+      baseAlunos: 130,
+      ticketMensalidade: 550,
+      churnPct: 0.10,
+    },
+  },
   unicv: {
     valorVender: [7000, 8400, 10500, 10150, 9100, 7000, 6300, 14000, 8400, 9100, 16100, 7700],
     qtdPago: [583, 700, 875, 846, 758, 583, 525, 1167, 700, 758, 1073, 642],

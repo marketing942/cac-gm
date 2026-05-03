@@ -671,7 +671,7 @@ export default function MetasPage() {
       },
     ];
 
-    if (prod === "unicv") {
+    if (d.mensalidadeConfig) {
       metrics.push({
         key: "mensalidade",
         label: "Mensalidade",
@@ -969,7 +969,7 @@ export default function MetasPage() {
                   })}
 
                   {/* ── Mensalidade rows (Unicive only) ── */}
-                  {prod === "unicv" && (() => {
+                  {d.mensalidadeConfig && (() => {
                     const cfg = d.mensalidadeConfig ?? DEFAULT_MENSALIDADE_CONFIG;
                     return (
                       <>
@@ -1260,7 +1260,7 @@ export default function MetasPage() {
                 </tr>
 
                 {/* Conversão (computed) */}
-                <tr className={prod === "unicv" ? "border-b border-zinc-850" : ""}>
+                <tr className={d.mensalidadeConfig ? "border-b border-zinc-850" : ""}>
                   <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
                     Conversão
                   </td>
@@ -1285,7 +1285,7 @@ export default function MetasPage() {
                 </tr>
 
                 {/* Mensalidade Real (Unicive only, editable) */}
-                {prod === "unicv" && (
+                {d.mensalidadeConfig && (
                   <>
                     <tr className="border-t-2 border-t-zinc-700 border-b border-zinc-850">
                       <td
