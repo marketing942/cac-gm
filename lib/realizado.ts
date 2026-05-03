@@ -4,6 +4,7 @@ export interface RealizadoData {
   channels: Record<string, number[]>;
   qtd: number[];
   leads: number[];
+  mensalidade?: number[];
 }
 
 export type RealizadoAllData = Record<Product, RealizadoData>;
@@ -25,6 +26,7 @@ export interface RealizadoComputed {
     leads: number;
     ticketMedio: number;
     conversao: number;
+    mensalidade: number;
   };
 }
 
@@ -33,7 +35,9 @@ export function createEmptyRealizadoData(product: Product): RealizadoData {
   for (const ch of REALIZADO_CHANNELS[product]) {
     channels[ch] = Array(12).fill(0);
   }
-  return { channels, qtd: Array(12).fill(0), leads: Array(12).fill(0) };
+  const base: RealizadoData = { channels, qtd: Array(12).fill(0), leads: Array(12).fill(0) };
+  if (product === "unicv") base.mensalidade = Array(12).fill(0);
+  return base;
 }
 
 export function computeRealizado(d: RealizadoData): RealizadoComputed {
@@ -73,6 +77,7 @@ export function computeRealizado(d: RealizadoData): RealizadoComputed {
       leads: anualLeads,
       ticketMedio: anualQtd > 0 ? anualReceita / anualQtd : 0,
       conversao: anualLeads > 0 ? anualQtd / anualLeads : 0,
+      mensalidade: sum(d.mensalidade ?? []),
     },
   };
 }

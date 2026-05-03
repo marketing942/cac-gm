@@ -8,10 +8,12 @@ import { useUser } from "@/components/user-provider";
 import {
   computeMetas,
   createEmptyMetasData,
+  DEFAULT_MENSALIDADE_CONFIG,
   fmtBRLMetas,
   fmtInt,
   fmtPctMetas,
   METAS_REVENUE_CATEGORIES,
+  type MensalidadeConfig,
   type MetasData,
   type MetasNumericField,
 } from "@/lib/metas";
@@ -546,6 +548,35 @@ export default function MetasPage() {
     [prod]
   );
 
+  const updateMensalidadeConfig = useCallback(
+    (key: keyof MensalidadeConfig, value: number) => {
+      setAllData((prev) => {
+        if (!prev) return prev;
+        const cfg = prev[prod].mensalidadeConfig ?? { ...DEFAULT_MENSALIDADE_CONFIG };
+        return {
+          ...prev,
+          [prod]: {
+            ...prev[prod],
+            mensalidadeConfig: { ...cfg, [key]: value },
+          },
+        };
+      });
+    },
+    [prod]
+  );
+
+  const updateRealizadoMensalidade = useCallback(
+    (monthIdx: number, value: number) => {
+      setRealizadoData((prev) => {
+        if (!prev) return prev;
+        const arr = [...(prev[prod].mensalidade ?? Array(12).fill(0))];
+        arr[monthIdx] = value;
+        return { ...prev, [prod]: { ...prev[prod], mensalidade: arr } };
+      });
+    },
+    [prod]
+  );
+
   const categories = METAS_REVENUE_CATEGORIES[prod];
 
   /* ── Desdobramento helpers ── */
@@ -581,7 +612,7 @@ export default function MetasPage() {
   /* ── Comparativo metrics ── */
   const comparativoMetrics = useMemo(() => {
     const metaLeads = d.qtdPago.map((v, i) => v + d.qtdOrganico[i]);
-    return [
+    const metrics = [
       {
         key: "faturamento",
         label: "Faturamento",
@@ -628,7 +659,21 @@ export default function MetasPage() {
         anualReal: rComp.anual.conversao,
       },
     ];
-  }, [d, comp, rd, rComp]);
+
+    if (prod === "unicv") {
+      metrics.push({
+        key: "mensalidade",
+        label: "Mensalidade",
+        meta: comp.repasse,
+        real: rd.mensalidade ?? Array(12).fill(0),
+        type: "currency" as const,
+        anualMeta: comp.anual.repasse,
+        anualReal: rComp.anual.mensalidade,
+      });
+    }
+
+    return metrics;
+  }, [d, comp, rd, rComp, prod]);
 
   /* ── Loading / Error states ── */
 
@@ -936,6 +981,120 @@ export default function MetasPage() {
                       </React.Fragment>
                     );
                   })}
+
+                  {/* ── Mensalidade rows (Unicive only) ── */}
+                  {prod === "unicv" && (() => {
+                    const cfg = d.mensalidadeConfig ?? DEFAULT_MENSALIDADE_CONFIG;
+                    return (
+                      <>
+                        {/* Config header row */}
+                        <tr className="border-t-2 border-t-zinc-700 border-b border-zinc-850">
+                          <td
+                            colSpan={14}
+                            className="px-4 py-3 text-[13px] font-bold"
+                            style={{ color: meta.accent }}
+                          >
+                            Mensalidade
+                            <span className="ml-2 text-[10px] font-medium text-zinc-500">
+                              (Base: {fmtInt(cfg.baseAlunos)} alunos · Ticket: {fmtBRLMetas(cfg.ticketMensalidade)} · Churn: {fmtPctMetas(cfg.churnPct)})
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Config editable row */}
+                        <tr className="border-b border-zinc-850 bg-surface-0/30">
+                          <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                            Configuração
+                          </td>
+                          <td colSpan={4} className="px-2 py-2">
+                            <div className="flex items-center gap-4">
+                              <label className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                                Base Alunos
+                                <div className="w-[80px]">
+                                  <EditableNumber
+                                    value={cfg.baseAlunos}
+                                    onChange={(v) => updateMensalidadeConfig("baseAlunos", v)}
+                                    readOnly={!isAdmin}
+                                  />
+                                </div>
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                                Ticket R$
+                                <div className="w-[70px]">
+                                  <EditableNumber
+                                    value={cfg.ticketMensalidade}
+                                    onChange={(v) => updateMensalidadeConfig("ticketMensalidade", v)}
+                                    readOnly={!isAdmin}
+                                  />
+                                </div>
+                              </label>
+                              <label className="flex items-center gap-1.5 text-[11px] text-zinc-400">
+                                Churn %
+                                <div className="w-[60px]">
+                                  <EditablePct
+                                    value={cfg.churnPct}
+                                    onChange={(v) => updateMensalidadeConfig("churnPct", v)}
+                                    readOnly={!isAdmin}
+                                  />
+                                </div>
+                              </label>
+                            </div>
+                          </td>
+                          <td colSpan={9}></td>
+                        </tr>
+
+                        {/* Alunos Ativos (computed) */}
+                        <tr className="border-b border-zinc-850">
+                          <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                            Alunos Ativos
+                          </td>
+                          {MONTHS.map((_, i) => (
+                            <td key={i} className="px-1.5 py-1.5">
+                              <div
+                                className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
+                                style={{ fontFeatureSettings: "'tnum'" }}
+                              >
+                                {fmtInt(comp.alunosAtivos[i])}
+                              </div>
+                            </td>
+                          ))}
+                          <td className="border-l border-zinc-850 px-2 py-1.5">
+                            <div
+                              className="px-1 py-0.5 text-right text-[12px] font-bold"
+                              style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                            >
+                              {fmtInt(comp.anual.alunosAtivos)}
+                            </div>
+                          </td>
+                        </tr>
+
+                        {/* Repasse (computed) */}
+                        <tr className="border-b border-zinc-850 bg-surface-0/30">
+                          <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                            Repasse Mensal
+                          </td>
+                          {MONTHS.map((_, i) => (
+                            <td key={i} className="px-1.5 py-1.5">
+                              <div
+                                className="px-1 py-0.5 text-right text-[12px] font-medium text-fg"
+                                style={{ fontFeatureSettings: "'tnum'" }}
+                              >
+                                {fmtBRLMetas(comp.repasse[i])}
+                              </div>
+                            </td>
+                          ))}
+                          <td className="border-l border-zinc-850 px-2 py-1.5">
+                            <div
+                              className="px-1 py-0.5 text-right text-[12px] font-bold"
+                              style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                            >
+                              {fmtBRLMetas(comp.anual.repasse)}
+                            </div>
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })()}
                 </tbody>
               </table>
             </div>
@@ -1115,7 +1274,7 @@ export default function MetasPage() {
                 </tr>
 
                 {/* Conversão (computed) */}
-                <tr>
+                <tr className={prod === "unicv" ? "border-b border-zinc-850" : ""}>
                   <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
                     Conversão
                   </td>
@@ -1138,6 +1297,44 @@ export default function MetasPage() {
                     </div>
                   </td>
                 </tr>
+
+                {/* Mensalidade Real (Unicive only, editable) */}
+                {prod === "unicv" && (
+                  <>
+                    <tr className="border-t-2 border-t-zinc-700 border-b border-zinc-850">
+                      <td
+                        colSpan={14}
+                        className="px-4 py-2.5 text-[13px] font-bold"
+                        style={{ color: meta.accent }}
+                      >
+                        Mensalidade
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="sticky left-0 z-10 bg-surface-1 px-4 py-2.5 text-[12px] font-semibold text-fg-body">
+                        Receita Mensalidade
+                      </td>
+                      {(rd.mensalidade ?? Array(12).fill(0)).map((v, i) => (
+                        <td key={i} className="px-1.5 py-1.5">
+                          <EditableNumber
+                            value={v}
+                            onChange={(nv) => updateRealizadoMensalidade(i, nv)}
+                            prefix="R$ "
+                            readOnly={!isAdmin}
+                          />
+                        </td>
+                      ))}
+                      <td className="border-l border-zinc-850 px-2 py-1.5">
+                        <div
+                          className="px-1 py-0.5 text-right text-[12px] font-bold"
+                          style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}
+                        >
+                          {fmtBRLMetas(rComp.anual.mensalidade)}
+                        </div>
+                      </td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
           </div>
