@@ -84,10 +84,10 @@ function IconLogout({ size = 16 }: { size?: number }) {
 }
 
 const ITEMS: NavItem[] = [
-  { key: "cac", label: "CAC", href: "/" },
-  { key: "breakeven", label: "Breakeven", href: "/breakeven" },
   { key: "metas", label: "Metas Anuais", href: "/metas" },
   { key: "pace", label: "Pace", href: "/pace" },
+  { key: "cac", label: "CAC", href: "/" },
+  { key: "breakeven", label: "Breakeven", href: "/breakeven" },
 ];
 
 const ITEM_ICONS: Record<string, React.ReactNode> = {

@@ -19,6 +19,11 @@ import {
   seedInitialData,
   upsertProduct,
 } from "@/lib/data-store";
+import { loadRealizadoData } from "@/lib/realizado-store";
+import {
+  createEmptyRealizadoData,
+  type RealizadoAllData,
+} from "@/lib/realizado";
 import { Header } from "@/components/header";
 import { KpiCard } from "@/components/kpi-card";
 import { LineChart } from "@/components/line-chart";
@@ -38,6 +43,8 @@ export default function Home() {
   const [prod, setProd] = useState<Product>("cppem");
   const [syncState, setSyncState] = useState<SyncState>("idle");
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [realizadoData, setRealizadoData] = useState<RealizadoAllData | null>(null);
 
   const lastSavedRef = useRef<CACData>({});
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,6 +72,18 @@ export default function Home() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Load realizado data (for auto-sync clientes)
+  useEffect(() => {
+    (async () => {
+      try {
+        const rData = await loadRealizadoData(year);
+        setRealizadoData(rData);
+      } catch (e) {
+        console.error("Failed to load realizado data for CAC sync", e);
+      }
+    })();
+  }, [year]);
 
   // Debounced diff-based save (admin only)
   useEffect(() => {
@@ -108,7 +127,11 @@ export default function Home() {
   }, [data]);
 
   const yearData = (data && data[year]) ?? createEmptyYear();
-  const d = yearData[prod];
+  const rawD = yearData[prod];
+
+  const rdQtd = realizadoData?.[prod]?.qtd;
+  const hasRealizadoSync = rdQtd != null && rdQtd.some((v) => v > 0);
+  const d = hasRealizadoSync ? { ...rawD, clientes: rdQtd } : rawD;
   const comp = useMemo(() => computeCAC(d), [d]);
 
   const meta = PRODUCT_META[prod];
@@ -279,6 +302,7 @@ export default function Home() {
             accent={accent}
             onUpdate={updateField}
             readOnly={!isAdmin}
+            autoSyncClientes={hasRealizadoSync}
           />
         </div>
 

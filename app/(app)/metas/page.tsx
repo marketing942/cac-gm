@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { MONTHS, PRODUCTS, PRODUCT_META, type Product } from "@/lib/data";
 import { YearSelect } from "@/components/year-select";
+import { DropdownSelect } from "@/components/dropdown-select";
 import type { MetasComputed } from "@/lib/metas";
 import { useUser } from "@/components/user-provider";
 import {
@@ -343,6 +344,16 @@ function fmtDelta(delta: number, type: "currency" | "number" | "percent"): strin
   if (type === "percent")
     return `${prefix}${(delta * 100).toFixed(1)}pp`;
   return `${prefix}${Math.round(delta).toLocaleString("pt-BR")}`;
+}
+
+function semestreVal(arr: number[], half: 1 | 2, type: "currency" | "number" | "percent"): number {
+  const start = half === 1 ? 0 : 6;
+  const slice = arr.slice(start, start + 6);
+  if (type === "percent") {
+    const nonZero = slice.filter((v) => v > 0);
+    return nonZero.length > 0 ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
+  }
+  return slice.reduce((a, b) => a + b, 0);
 }
 
 /* ════════════════════════════════════════════════════════════ */
@@ -710,12 +721,6 @@ export default function MetasPage() {
   /* ── RENDER                                                ── */
   /* ════════════════════════════════════════════════════════════ */
 
-  const TAB_LABELS: Record<Tab, string> = {
-    desdobramento: "Desdobramento",
-    realizado: "Realizado",
-    comparativo: "Comparativo",
-  };
-
   return (
     <div className="min-h-screen bg-surface-0 text-fg">
       {/* ── Header ── */}
@@ -741,45 +746,26 @@ export default function MetasPage() {
         <div className="flex flex-wrap items-center gap-3">
           <YearSelect value={year} onChange={setYear} accent={meta.accent} />
 
-          {/* Tab selector */}
-          <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {(["desdobramento", "realizado", "comparativo"] as Tab[]).map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
-                style={{
-                  background: tab === t ? meta.accent : "transparent",
-                  color: tab === t ? "#0a0a0a" : "#71717a",
-                  cursor: "pointer",
-                }}
-              >
-                {TAB_LABELS[t]}
-              </button>
-            ))}
-          </div>
+          <DropdownSelect
+            value={tab}
+            options={[
+              { value: "desdobramento", label: "Desdobramento" },
+              { value: "realizado", label: "Realizado" },
+              { value: "comparativo", label: "Comparativo" },
+            ]}
+            onChange={(v) => setTab(v as Tab)}
+            accent={meta.accent}
+          />
 
-          {/* Product selector */}
-          <div className="flex rounded-lg border border-zinc-850 bg-surface-2 p-[3px]">
-            {PRODUCTS.map((p) => {
-              const m = PRODUCT_META[p];
-              const active = prod === p;
-              return (
-                <button
-                  key={p}
-                  onClick={() => setProd(p)}
-                  className="rounded-md border-none px-4 py-[7px] text-[12px] font-bold tracking-wide transition-all duration-200"
-                  style={{
-                    background: active ? m.accent : "transparent",
-                    color: active ? "#0a0a0a" : "#71717a",
-                    cursor: "pointer",
-                  }}
-                >
-                  {m.short}
-                </button>
-              );
-            })}
-          </div>
+          <DropdownSelect
+            value={prod}
+            options={PRODUCTS.map((p) => ({
+              value: p,
+              label: PRODUCT_META[p].short,
+            }))}
+            onChange={(v) => setProd(v as Product)}
+            accent={meta.accent}
+          />
         </div>
       </header>
 
@@ -1345,7 +1331,7 @@ export default function MetasPage() {
         {/* ═══════════════════════════════════════════════ */}
         {tab === "comparativo" && (
           <div className="overflow-x-auto rounded-xl border border-zinc-850 bg-surface-1">
-            <table className="w-full min-w-[1100px] text-[12px]">
+            <table className="w-full min-w-[1300px] text-[12px]">
               <thead>
                 <tr className="border-b border-zinc-850">
                   <th className="sticky left-0 z-10 bg-surface-1 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-[1px] text-zinc-500">
@@ -1360,6 +1346,12 @@ export default function MetasPage() {
                       {m}
                     </th>
                   ))}
+                  <th className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500" style={{ minWidth: 90 }}>
+                    S1
+                  </th>
+                  <th className="px-2 py-3 text-center text-[11px] font-bold uppercase tracking-[1px] text-zinc-500" style={{ minWidth: 90 }}>
+                    S2
+                  </th>
                   <th
                     className="border-l border-zinc-850 px-3 py-3 text-center text-[11px] font-bold uppercase tracking-[1px]"
                     style={{ color: meta.accent, minWidth: 100 }}
@@ -1415,6 +1407,16 @@ export default function MetasPage() {
                           </div>
                         </td>
                       ))}
+                      {([1, 2] as const).map((half) => {
+                        const sv = semestreVal(metric.meta, half, metric.type);
+                        return (
+                          <td key={`s${half}`} className="px-1.5 py-1.5">
+                            <div className="px-1 py-0.5 text-right text-[12px] font-semibold text-fg-body" style={{ fontFeatureSettings: "'tnum'" }}>
+                              {sv > 0 ? formatValue(sv, metric.type) : "—"}
+                            </div>
+                          </td>
+                        );
+                      })}
                       <td className="border-l border-zinc-850 px-2 py-1.5">
                         <div
                           className="px-1 py-0.5 text-right text-[12px] font-bold text-fg-body"
@@ -1440,6 +1442,16 @@ export default function MetasPage() {
                           </div>
                         </td>
                       ))}
+                      {([1, 2] as const).map((half) => {
+                        const sv = semestreVal(metric.real, half, metric.type);
+                        return (
+                          <td key={`s${half}`} className="px-1.5 py-1.5">
+                            <div className="px-1 py-0.5 text-right text-[12px] font-semibold text-fg" style={{ fontFeatureSettings: "'tnum'" }}>
+                              {sv > 0 ? formatValue(sv, metric.type) : "—"}
+                            </div>
+                          </td>
+                        );
+                      })}
                       <td className="border-l border-zinc-850 px-2 py-1.5">
                         <div
                           className="px-1 py-0.5 text-right text-[12px] font-bold"
@@ -1475,6 +1487,23 @@ export default function MetasPage() {
                               <div className="px-1 py-0.5 text-right text-[11px] text-zinc-600">
                                 —
                               </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                      {([1, 2] as const).map((half) => {
+                        const sm = semestreVal(metric.meta, half, metric.type);
+                        const sr = semestreVal(metric.real, half, metric.type);
+                        const hasBoth = sr > 0 || sm > 0;
+                        const delta = sr - sm;
+                        return (
+                          <td key={`s${half}`} className="px-1.5 py-1">
+                            {hasBoth ? (
+                              <div className="px-1 py-0.5 text-right text-[11px] font-bold" style={{ fontFeatureSettings: "'tnum'", color: delta >= 0 ? "#a3e635" : "#f87171" }}>
+                                {fmtDelta(delta, metric.type)}
+                              </div>
+                            ) : (
+                              <div className="px-1 py-0.5 text-right text-[11px] text-zinc-600">—</div>
                             )}
                           </td>
                         );
@@ -1521,6 +1550,16 @@ export default function MetasPage() {
                                 </div>
                               </td>
                             ))}
+                            {([1, 2] as const).map((half) => {
+                              const sv = semestreVal(catMeta, half, "currency");
+                              return (
+                                <td key={`s${half}`} className="px-1.5 py-1">
+                                  <div className="px-1 py-0.5 text-right text-[11px] font-semibold text-fg-body" style={{ fontFeatureSettings: "'tnum'" }}>
+                                    {sv > 0 ? fmtBRLMetas(sv) : "—"}
+                                  </div>
+                                </td>
+                              );
+                            })}
                             <td className="border-l border-zinc-850 px-2 py-1">
                               <div className="px-1 py-0.5 text-right text-[11px] font-bold text-fg-body" style={{ fontFeatureSettings: "'tnum'" }}>
                                 {catMetaAnual > 0 ? fmtBRLMetas(catMetaAnual) : "—"}
@@ -1538,6 +1577,16 @@ export default function MetasPage() {
                                 </div>
                               </td>
                             ))}
+                            {([1, 2] as const).map((half) => {
+                              const sv = semestreVal(catReal, half, "currency");
+                              return (
+                                <td key={`s${half}`} className="px-1.5 py-1">
+                                  <div className="px-1 py-0.5 text-right text-[11px] font-semibold text-fg" style={{ fontFeatureSettings: "'tnum'" }}>
+                                    {sv > 0 ? fmtBRLMetas(sv) : "—"}
+                                  </div>
+                                </td>
+                              );
+                            })}
                             <td className="border-l border-zinc-850 px-2 py-1">
                               <div className="px-1 py-0.5 text-right text-[11px] font-bold" style={{ fontFeatureSettings: "'tnum'", color: meta.accent }}>
                                 {catRealAnual > 0 ? fmtBRLMetas(catRealAnual) : "—"}
@@ -1554,6 +1603,23 @@ export default function MetasPage() {
                               const delta = rv - mv;
                               return (
                                 <td key={i} className="px-1.5 py-0.5">
+                                  {hasBoth ? (
+                                    <div className="px-1 py-0.5 text-right text-[10px] font-bold" style={{ fontFeatureSettings: "'tnum'", color: delta >= 0 ? "#a3e635" : "#f87171" }}>
+                                      {fmtDelta(delta, "currency")}
+                                    </div>
+                                  ) : (
+                                    <div className="px-1 py-0.5 text-right text-[10px] text-zinc-600">—</div>
+                                  )}
+                                </td>
+                              );
+                            })}
+                            {([1, 2] as const).map((half) => {
+                              const sm = semestreVal(catMeta, half, "currency");
+                              const sr = semestreVal(catReal, half, "currency");
+                              const hasBoth = sr > 0 || sm > 0;
+                              const delta = sr - sm;
+                              return (
+                                <td key={`s${half}`} className="px-1.5 py-0.5">
                                   {hasBoth ? (
                                     <div className="px-1 py-0.5 text-right text-[10px] font-bold" style={{ fontFeatureSettings: "'tnum'", color: delta >= 0 ? "#a3e635" : "#f87171" }}>
                                       {fmtDelta(delta, "currency")}
