@@ -39,7 +39,7 @@ export async function loadRealizadoData(
         qtd: raw.qtd ?? Array(12).fill(0),
         leads: raw.leads ?? Array(12).fill(0),
       };
-      if (p === "unicv") {
+      if (p === "unicv" || p === "colegio") {
         loaded.mensalidade = raw.mensalidade ?? Array(12).fill(0);
       }
       out[p] = loaded;

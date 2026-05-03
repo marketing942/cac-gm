@@ -36,7 +36,7 @@ export function createEmptyRealizadoData(product: Product): RealizadoData {
     channels[ch] = Array(12).fill(0);
   }
   const base: RealizadoData = { channels, qtd: Array(12).fill(0), leads: Array(12).fill(0) };
-  if (product === "unicv") base.mensalidade = Array(12).fill(0);
+  if (product === "unicv" || product === "colegio") base.mensalidade = Array(12).fill(0);
   return base;
 }
 
