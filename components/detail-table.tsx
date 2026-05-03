@@ -10,6 +10,7 @@ interface DetailTableProps {
   accent: string;
   onUpdate: (field: keyof ProductData, idx: number, value: number) => void;
   readOnly?: boolean;
+  autoSyncClientes?: boolean;
 }
 
 const thCls =
@@ -19,7 +20,7 @@ const tdLabelCls =
 const tdValCls =
   "border-b border-zinc-900 px-2 py-2.5 text-right text-[13px] text-fg-body";
 
-export function DetailTable({ d, comp, onUpdate, readOnly = false }: DetailTableProps) {
+export function DetailTable({ d, comp, onUpdate, readOnly = false, autoSyncClientes = false }: DetailTableProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-zinc-850 bg-surface-1">
       <div className="flex items-center justify-between px-5 pt-[18px]">
@@ -182,7 +183,11 @@ export function DetailTable({ d, comp, onUpdate, readOnly = false }: DetailTable
             <tr>
               <td className={tdLabelCls}>
                 Clientes Adquiridos
-                <span className="ml-1.5 text-[9px] text-amber-400/70">●</span>
+                {autoSyncClientes ? (
+                  <span className="ml-1.5 text-[9px] text-emerald-400/80">⟳ via Metas</span>
+                ) : (
+                  <span className="ml-1.5 text-[9px] text-amber-400/70">●</span>
+                )}
               </td>
               {d.clientes.map((v, i) => (
                 <td key={i} className="border-b border-zinc-900 px-1 py-1.5">
@@ -190,7 +195,7 @@ export function DetailTable({ d, comp, onUpdate, readOnly = false }: DetailTable
                     value={v}
                     onChange={(val) => onUpdate("clientes", i, val)}
                     width={66}
-                    readOnly={readOnly}
+                    readOnly={readOnly || autoSyncClientes}
                   />
                 </td>
               ))}
